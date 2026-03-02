@@ -280,6 +280,71 @@ peon packs remove peon
 # Output: Error: cannot remove active pack. Switch to another pack first.
 ```
 
+**Remove All Packs (except active):**
+
+```bash
+peon packs remove --all
+```
+
+Removes all installed packs except the currently active one. Useful for cleaning up before a fresh install.
+
+## packs rotation
+
+Manage the pack rotation list and view rotation settings.
+
+### list
+
+Show the current rotation mode and pack list.
+
+```bash
+peon packs rotation list
+```
+
+**Output:**
+```
+Pack rotation mode: random
+Pack rotation list: [peon, glados, sc_kerrigan, peasant]
+```
+
+### add
+
+Add one or more packs to the rotation list.
+
+```bash
+peon packs rotation add duke_nukem,murloc
+```
+
+**Output:**
+```
+peon-ping: added duke_nukem to rotation
+peon-ping: added murloc to rotation
+Current rotation: [peon, glados, sc_kerrigan, duke_nukem, murloc]
+```
+
+**Behavior:**
+- Packs are appended to the `pack_rotation` array in `config.json`
+- Duplicates are automatically removed
+- Pack must be installed first (or it will be skipped)
+
+### remove
+
+Remove one or more packs from the rotation list.
+
+```bash
+peon packs rotation remove duke_nukem
+```
+
+**Output:**
+```
+peon-ping: removed duke_nukem from rotation
+Current rotation: [peon, glados, sc_kerrigan, murloc]
+```
+
+**Behavior:**
+- Removes packs from `pack_rotation` array
+- Does not uninstall the pack (use `peon packs remove` for that)
+- Rotation mode remains unchanged
+
 ## Pack Rotation Modes
 
 Packs can be assigned via three strategies (configured in `config.json`):

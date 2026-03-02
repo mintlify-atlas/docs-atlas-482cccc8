@@ -64,6 +64,91 @@ peon unmute  # Same as resume
 peon-ping: sounds resumed
 ```
 
+## status
+
+Check if peon-ping is paused or active, and show current configuration.
+
+```bash
+peon status
+```
+
+**Output (when active):**
+```
+peon-ping: active
+peon-ping: desktop notifications on
+peon-ping: notification style overlay
+peon-ping: notification position top-center
+peon-ping: dismiss time 4s
+peon-ping: volume 0.5
+peon-ping: pack peon (5 sounds loaded)
+peon-ping: rotation mode random
+```
+
+**Output (when paused):**
+```
+peon-ping: paused
+peon-ping: desktop notifications on
+peon-ping: notification style overlay
+peon-ping: notification position top-center
+peon-ping: dismiss time 4s
+peon-ping: volume 0.5
+peon-ping: pack peon (5 sounds loaded)
+peon-ping: rotation mode random
+```
+
+**Verbose Mode:**
+```bash
+peon status --verbose
+```
+
+Shows additional details:
+- Headphones detection status
+- Mobile notification configuration
+- Notification templates
+- Project name overrides
+- Trainer status
+
+## update
+
+Update peon-ping to the latest version and refresh all sound packs.
+
+```bash
+peon update
+```
+
+**What it does:**
+- Migrates config keys if needed (`active_pack` → `default_pack`)
+- Re-runs the installer to update `peon.sh` and all scripts
+- Preserves your configuration and installed packs
+- Updates pack manifests from the registry
+
+**Output:**
+```
+Updating peon-ping...
+peon-ping: config migrated (active_pack → default_pack, agentskill → session_override)
+Fetching latest version...
+Successfully updated to v2.12.0
+```
+
+<Note>This command requires `curl` and internet access to fetch the latest installer from GitHub.</Note>
+
+## help
+
+Show the complete CLI help with all available commands.
+
+```bash
+peon help
+peon --help
+peon -h
+```
+
+Displays:
+- All top-level commands with descriptions
+- Pack management subcommands
+- Mobile notification setup
+- Trainer commands
+- Relay server options
+
 ## volume
 
 Get or set volume level (0.0–1.0).
