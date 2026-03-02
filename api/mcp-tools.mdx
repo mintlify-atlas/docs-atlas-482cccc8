@@ -1,0 +1,221 @@
+---
+title: MCP Tools
+description: play_sound tool for agent-controlled sound playback
+---
+
+# MCP Tools
+
+The PeonPing MCP server provides a single tool for playing sounds.
+
+## play_sound
+
+Play one or more sounds by key.
+
+### Parameters
+
+<ParamField path="sound" type="string">
+  Sound key in format `pack/sound` (e.g., `peon/PeonReady1`). Mutually exclusive with `sounds`.
+</ParamField>
+
+<ParamField path="sounds" type="string[]">
+  Array of sound keys for batch playback (max 5). Mutually exclusive with `sound`.
+</ParamField>
+
+### Sound Key Format
+
+Sound keys use the format: `pack_name/sound_name`
+
+- **pack_name** — pack directory name (e.g., `peon`, `glados`, `duke_nukem`)
+- **sound_name** — sound file name without extension (e.g., `PeonReady1` for `sounds/PeonReady1.wav`)
+
+Example keys:
+- `peon/PeonReady1`
+- `glados/OhItsYou`
+- `sc_kerrigan/IReadYou`
+- `duke_nukem/SonOfABitch`
+
+### Response
+
+<ResponseField name="content" type="array">
+  Array with a single text result object
+  
+  <ResponseField name="type" type="string">
+    Always `"text"`
+  </ResponseField>
+  
+  <ResponseField name="text" type="string">
+    Result summary (one line per sound)
+  </ResponseField>
+</ResponseField>
+
+### Example: Single Sound
+
+**Request:**
+
+```json
+{
+  "tool": "play_sound",
+  "sound": "peon/PeonReady1"
+}
+```
+
+**Response:**
+
+```json
+{
+  "content": [
+    {
+      "type": "text",
+      "text": "🔊 peon/PeonReady1 (\"Ready to work?\")"
+    }
+  ]
+}
+```
+
+### Example: Multiple Sounds
+
+**Request:**
+
+```json
+{
+  "tool": "play_sound",
+  "sounds": [
+    "peon/PeonReady1",
+    "glados/OhItsYou",
+    "sc_kerrigan/IReadYou"
+  ]
+}
+```
+
+**Response:**
+
+```json
+{
+  "content": [
+    {
+      "type": "text",
+      "text": "🔊 peon/PeonReady1 (\"Ready to work?\")\n🔊 glados/OhItsYou (\"Oh, it's you.\")\n🔊 sc_kerrigan/IReadYou (\"I read you.\")"
+    }
+  ]
+}
+```
+
+### Error Responses
+
+**Invalid key format:**
+
+```json
+{
+  "content": [
+    {
+      "type": "text",
+      "text": "❌ Invalid: \"invalidkey\""
+    }
+  ]
+}
+```
+
+**Sound not found:**
+
+```json
+{
+  "content": [
+    {
+      "type": "text",
+      "text": "❌ Not found: \"peon/NonexistentSound\""
+    }
+  ]
+}
+```
+
+**File missing:**
+
+```json
+{
+  "content": [
+    {
+      "type": "text",
+      "text": "❌ Missing file: \"peon/PeonReady1\""
+    }
+  ]
+}
+```
+
+### Batch Playback
+
+When using `sounds` array:
+
+- **Maximum 5 sounds** — requests with >5 sounds are truncated
+- **Sequential playback** — sounds play in order via queue
+- **Partial success** — valid sounds play even if some keys are invalid
+
+Example batch with mixed results:
+
+```json
+{
+  "tool": "play_sound",
+  "sounds": [
+    "peon/PeonReady1",
+    "invalid",
+    "glados/OhItsYou"
+  ]
+}
+```
+
+Response:
+
+```json
+{
+  "content": [
+    {
+      "type": "text",
+      "text": "🔊 peon/PeonReady1 (\"Ready to work?\")\n❌ Invalid: \"invalid\"\n🔊 glados/OhItsYou (\"Oh, it's you.\")"
+    }
+  ]
+}
+```
+
+### Sound Discovery
+
+To discover available sounds, read the `peon-ping://catalog` resource:
+
+```typescript
+// Agent reads catalog once per session
+resource_read: {
+  uri: "peon-ping://catalog"
+}
+
+// Returns all packs and sounds
+{
+  "contents": [
+    {
+      "uri": "peon-ping://catalog",
+      "text": "165 packs. Use play_sound with \"pack/SoundName\".\n\npeon (Orc Peon): peon/PeonReady1 (\"Ready to work?\"), peon/PeonWhat1 (\"Yes?\"), ...\nglados (GLaDOS): glados/OhItsYou (\"Oh, it's you.\"), ..."
+    }
+  ]
+}
+```
+
+See [MCP Resources](/api/mcp-resources) for catalog format details.
+
+### Platform-Specific Behavior
+
+| Platform | Audio Backend | Volume Control |
+|---|---|---|
+| macOS | `afplay` | `-v` flag (0.0–1.0) |
+| Linux (PipeWire) | `pw-play` | `--volume` flag (0.0–1.0) |
+| Linux (PulseAudio) | `paplay` | `--volume` flag (0–65536) |
+| Linux (ffplay) | `ffplay` | `-volume` flag (0–100) |
+| Linux (mpv) | `mpv` | `--volume` flag (0–100) |
+| Windows/WSL2 | PowerShell MediaPlayer | `.Volume` property (0.0–1.0) |
+
+Volume is read from `config.json` or `PEON_VOLUME` environment variable (default: 0.5).
+
+### Implementation Details
+
+- **Queue-based playback** — sounds are queued and played sequentially
+- **Non-blocking** — tool returns immediately (audio plays async)
+- **Sound Effects device routing** — on macOS, routes to Sound Effects device if `use_sound_effects_device` is enabled
+- **No-repeat logic not enforced** — MCP server plays exactly what the agent requests
+
+See [mcp/peon-mcp.js](https://github.com/PeonPing/peon-ping/blob/main/mcp/peon-mcp.js) for full implementation.

@@ -1,0 +1,187 @@
+---
+title: Pack Manifest (openpeon.json)
+description: CESP openpeon.json manifest structure for sound packs
+---
+
+# Pack Manifest Structure
+
+Every CESP-compliant sound pack includes an `openpeon.json` manifest file that defines pack metadata and maps event categories to sound files.
+
+## Manifest Schema
+
+```json
+{
+  "version": "1.0",
+  "name": "peon",
+  "display_name": "Orc Peon (Warcraft III)",
+  "description": "Classic Warcraft III peon voice lines",
+  "author": "Blizzard Entertainment",
+  "license": "Fair Use",
+  "icon": "icon.png",
+  "categories": {
+    "session.start": {
+      "sounds": [
+        { "file": "sounds/PeonReady1.wav", "label": "Ready to work?" },
+        { "file": "sounds/PeonWhat1.wav", "label": "Yes?" }
+      ]
+    },
+    "task.complete": {
+      "sounds": [
+        { "file": "sounds/PeonYes1.wav", "label": "Work, work." },
+        { "file": "sounds/PeonYes4.wav", "label": "Okie dokie." }
+      ]
+    }
+  }
+}
+```
+
+## Top-Level Fields
+
+<ParamField path="version" type="string" required>
+  CESP version (currently `"1.0"`)
+</ParamField>
+
+<ParamField path="name" type="string" required>
+  Pack identifier (lowercase, alphanumeric + underscores). Must match directory name.
+</ParamField>
+
+<ParamField path="display_name" type="string" required>
+  Human-readable pack name shown in CLI and UI
+</ParamField>
+
+<ParamField path="description" type="string">
+  Pack description (one sentence)
+</ParamField>
+
+<ParamField path="author" type="string">
+  Original content creator or publisher
+</ParamField>
+
+<ParamField path="license" type="string">
+  License type (e.g., "Fair Use", "CC BY 4.0", "MIT")
+</ParamField>
+
+<ParamField path="icon" type="string">
+  Default pack icon (relative path or URL). Falls back to `icon.png` in pack root.
+</ParamField>
+
+<ParamField path="categories" type="object" required>
+  Map of CESP category names to sound arrays. See [Event Categories](/api/event-categories).
+</ParamField>
+
+## Category Object
+
+Each category contains:
+
+<ParamField path="sounds" type="array" required>
+  Array of sound objects
+</ParamField>
+
+<ParamField path="icon" type="string">
+  Category-specific icon (overrides pack-level icon for this category)
+</ParamField>
+
+## Sound Object
+
+<ParamField path="file" type="string" required>
+  Path to audio file relative to pack root (e.g., `sounds/PeonReady1.wav`)
+</ParamField>
+
+<ParamField path="label" type="string" required>
+  Display label or transcript (e.g., `"Ready to work?"`)
+</ParamField>
+
+<ParamField path="icon" type="string">
+  Sound-specific icon (highest priority in icon resolution chain)
+</ParamField>
+
+## Icon Resolution Chain
+
+PeonPing resolves icons in this priority order:
+
+1. **Sound-level icon** — `categories.*.sounds[].icon`
+2. **Category-level icon** — `categories.*.icon`
+3. **Pack-level icon** — `icon` (top-level field)
+4. **Default pack icon** — `icon.png` in pack root
+
+Icons can be:
+- **Relative paths** — resolved from pack root (e.g., `icon.png`, `images/avatar.png`)
+- **URLs** — downloaded and cached (e.g., `https://example.com/icon.png`)
+
+## Supported Audio Formats
+
+- WAV (recommended)
+- MP3
+- OGG
+- FLAC
+- AAC
+- M4A
+- OPUS
+
+## Pack Directory Structure
+
+```
+peon/
+├── openpeon.json       # Manifest (required)
+├── icon.png            # Pack icon (optional)
+└── sounds/             # Audio files (optional subdirectory)
+    ├── PeonReady1.wav
+    ├── PeonWhat1.wav
+    └── PeonYes1.wav
+```
+
+## Validation
+
+PeonPing validates manifests on install:
+
+- `version` must be `"1.0"`
+- `name` must match directory name
+- All `file` paths must exist
+- All `file` paths must have supported audio extensions
+- No path traversal (`..`) allowed
+
+## Legacy Format
+
+Older packs may use `manifest.json` instead of `openpeon.json`. Both are supported, but `openpeon.json` takes precedence.
+
+## Example: Multi-Category Pack
+
+```json
+{
+  "version": "1.0",
+  "name": "glados",
+  "display_name": "GLaDOS (Portal)",
+  "description": "Passive-aggressive AI companion",
+  "author": "Valve Corporation",
+  "license": "Fair Use",
+  "icon": "glados-icon.png",
+  "categories": {
+    "session.start": {
+      "sounds": [
+        { "file": "sounds/oh_its_you.wav", "label": "Oh, it's you." }
+      ]
+    },
+    "task.complete": {
+      "sounds": [
+        { "file": "sounds/well_done.wav", "label": "Well done." },
+        { "file": "sounds/you_monster.wav", "label": "You monster." }
+      ]
+    },
+    "task.error": {
+      "sounds": [
+        { "file": "sounds/catastrophic_failure.wav", "label": "That's a catastrophic failure." }
+      ],
+      "icon": "error-icon.png"
+    },
+    "input.required": {
+      "sounds": [
+        { "file": "sounds/are_you_still_there.wav", "label": "Are you still there?" }
+      ]
+    }
+  }
+}
+```
+
+## Creating Custom Packs
+
+See [openpeon.com/create](https://openpeon.com/create) for the full pack creation guide.

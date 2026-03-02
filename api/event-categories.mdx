@@ -1,0 +1,174 @@
+---
+title: CESP Event Categories
+description: All CESP v1.0 event categories with descriptions and examples
+---
+
+# CESP Event Categories
+
+CESP v1.0 defines nine standardized event categories. Each category represents a specific type of coding event that can trigger sounds and notifications.
+
+## Core Categories
+
+### session.start
+
+**When it fires:** New coding session begins (IDE startup, workspace open, new conversation)
+
+**Examples:**
+- "Ready to work?"
+- "Yes?"
+- "What you want?"
+
+**Hook events:** `SessionStart`
+
+---
+
+### session.end
+
+**When it fires:** Coding session ends (IDE close, workspace close, conversation end)
+
+**Examples:**
+- "Work complete."
+- "Off I go then!"
+
+**Hook events:** `SessionEnd`
+
+**Note:** Currently defined in spec but not triggered by built-in hooks.
+
+---
+
+### task.acknowledge
+
+**When it fires:** Agent acknowledges a new task (user submits prompt, agent begins processing)
+
+**Examples:**
+- "I read you."
+- "On it."
+
+**Hook events:** `UserPromptSubmit`
+
+**Default:** Disabled (too noisy for most users). Enable via `peon` CLI or config.
+
+---
+
+### task.complete
+
+**When it fires:** Agent finishes a task and waits for input
+
+**Examples:**
+- "Work, work."
+- "Job's done!"
+- "Okie dokie."
+
+**Hook events:** `Stop`, `AfterAgent`
+
+---
+
+### task.progress
+
+**When it fires:** Long-running task makes progress (checkpoint, intermediate step)
+
+**Examples:**
+- "Still going..."
+- "Almost there."
+
+**Hook events:** Not currently triggered by built-in hooks.
+
+**Note:** Defined in spec for future use.
+
+---
+
+### task.error
+
+**When it fires:** Tool execution fails, command returns non-zero exit code, API error
+
+**Examples:**
+- "I can't do that."
+- "Son of a bitch!"
+
+**Hook events:** `PostToolUseFailure`, `errorOccurred`
+
+---
+
+### input.required
+
+**When it fires:** Agent needs user input (permission prompt, clarification question)
+
+**Examples:**
+- "Something need doing?"
+- "Hmm?"
+- "What you want?"
+
+**Hook events:** `PermissionRequest`, `Notification` (permission_prompt, elicitation_dialog)
+
+---
+
+### resource.limit
+
+**When it fires:** Resource constraint hit (rate limit, token limit, context compaction)
+
+**Examples:**
+- "Zug zug." (pack-dependent)
+
+**Hook events:** `PreCompact`
+
+---
+
+### user.spam
+
+**When it fires:** Rapid prompts detected (3+ prompts within 10 seconds by default)
+
+**Examples:**
+- "Me busy, leave me alone!"
+- "Stop poking me!"
+
+**Hook events:** `UserPromptSubmit` (spam detection logic)
+
+**Configuration:**
+
+<ParamField path="annoyed_threshold" type="number" default="3">
+  Number of prompts required to trigger spam detection
+</ParamField>
+
+<ParamField path="annoyed_window_seconds" type="number" default="10">
+  Time window (seconds) for spam detection
+</ParamField>
+
+## Category Configuration
+
+Toggle categories on/off in `config.json`:
+
+```json
+{
+  "categories": {
+    "session.start": true,
+    "task.acknowledge": false,
+    "task.complete": true,
+    "task.error": true,
+    "input.required": true,
+    "resource.limit": true,
+    "user.spam": true
+  }
+}
+```
+
+Or via CLI:
+
+```bash
+peon preview task.complete     # Preview all sounds in category
+peon preview --list            # List all categories in active pack
+```
+
+## IDE Event Mapping
+
+Different IDEs use different hook names. PeonPing adapters translate IDE-specific events to CESP categories:
+
+| IDE Hook | CESP Category |
+|---|---|
+| `SessionStart` | `session.start` |
+| `Stop`, `AfterAgent` | `task.complete` |
+| `PermissionRequest` | `input.required` |
+| `PostToolUseFailure` | `task.error` |
+| `PreCompact` | `resource.limit` |
+| `UserPromptSubmit` (spam) | `user.spam` |
+
+See [Multi-IDE Support](https://github.com/PeonPing/peon-ping#multi-ide-support) for adapter details.

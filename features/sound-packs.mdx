@@ -1,0 +1,360 @@
+---
+title: Sound Packs
+description: Browse, install, and switch between 165+ game character voice packs from Warcraft, StarCraft, Portal, and more
+---
+
+PeonPing ships with a rich library of sound packs featuring iconic game characters. Each pack contains voice lines organized by [CESP categories](/features/sound-events).
+
+## Default Packs
+
+The standard installer includes 5 curated packs:
+
+<CardGroup cols={2}>
+  <Card title="peon (Default)" icon="hammer">
+    **Character:** Orc Peon (Warcraft III)
+    
+    **Voice lines:**
+    - *"Ready to work?"*
+    - *"Work, work."*
+    - *"Okie dokie."*
+    - *"Me busy, leave me alone!"*
+    
+    **Best for:** Classic Warcraft nostalgia
+  </Card>
+  
+  <Card title="peasant" icon="person-digging">
+    **Character:** Human Peasant (Warcraft III)
+    
+    **Voice lines:**
+    - *"Yes, milord?"*
+    - *"Job's done!"*
+    - *"Ready, sir."*
+    
+    **Best for:** Professional tone with medieval charm
+  </Card>
+  
+  <Card title="sc_kerrigan" icon="alien">
+    **Character:** Sarah Kerrigan (StarCraft)
+    
+    **Voice lines:**
+    - *"I gotcha"*
+    - *"What now?"*
+    - *"Easily amused, huh?"*
+    - *"I read you."*
+    
+    **Best for:** Tactical, confident vibes
+  </Card>
+  
+  <Card title="sc_battlecruiser" icon="rocket">
+    **Character:** Battlecruiser (StarCraft)
+    
+    **Voice lines:**
+    - *"Battlecruiser operational"*
+    - *"Make it happen"*
+    - *"Engage"*
+    
+    **Best for:** Military precision and power
+  </Card>
+  
+  <Card title="glados" icon="robot">
+    **Character:** GLaDOS (Portal)
+    
+    **Voice lines:**
+    - *"Oh, it's you."*
+    - *"You monster."*
+    - *"Your entire team is dead."*
+    
+    **Best for:** Sarcastic AI overlord energy
+  </Card>
+</CardGroup>
+
+## Browse All Packs
+
+**[Explore 165+ packs with audio previews →](https://openpeon.com/packs)**
+
+### Popular Franchises
+
+- **Warcraft** — Peon, Peasant, Murloc, Wisp, Grunt, Footman, and more
+- **StarCraft** — Kerrigan, Battlecruiser, Marine, SCV, Zealot, Hydralisk
+- **Red Alert** — Soviet Commander, Allied Commander, Tanya, Engineer
+- **Portal** — GLaDOS, Wheatley, Cave Johnson
+- **Zelda** — Link, Navi, various NPCs
+- **Dota 2** — Hero voice lines
+- **Helldivers 2** — Squad callouts
+- **Elder Scrolls** — Guard, merchant, quest giver lines
+- **Duke Nukem** — Classic one-liners
+
+## Managing Packs
+
+### List Installed Packs
+
+```bash
+peon packs list
+```
+
+**Output:**
+```
+Installed packs:
+  peon (active)
+  peasant
+  sc_kerrigan
+  sc_battlecruiser
+  glados
+```
+
+### Browse Registry
+
+```bash
+peon packs list --registry
+```
+
+Shows all 165+ packs available in the [OpenPeon registry](https://github.com/PeonPing/registry).
+
+### Install Packs
+
+<Tabs>
+  <Tab title="Install Specific Packs">
+    ```bash
+    peon packs install glados,murloc,duke_nukem
+    ```
+    
+    Comma-separated list of pack names.
+  </Tab>
+  
+  <Tab title="Install All Packs">
+    ```bash
+    peon packs install --all
+    ```
+    
+    Downloads all 165+ packs from the registry. Takes a few minutes.
+  </Tab>
+  
+  <Tab title="Install During Setup">
+    ```bash
+    # Installer flags
+    curl -fsSL https://peonping.com/install | bash -s -- --all
+    curl -fsSL https://peonping.com/install | bash -s -- --packs=peon,glados,murloc
+    ```
+    
+    Specify packs at install time.
+  </Tab>
+  
+  <Tab title="Install Local Pack">
+    ```bash
+    peon packs install-local /path/to/custom-pack
+    ```
+    
+    Install a custom pack from a local directory. Pack must contain `openpeon.json`.
+  </Tab>
+</Tabs>
+
+### Switch Packs
+
+```bash
+# Switch to a specific pack
+peon packs use glados
+
+# Switch and install if not already installed
+peon packs use --install murloc
+
+# Cycle to next pack in rotation
+peon packs next
+```
+
+**Effect:** Immediately changes the active pack. Next event uses the new pack's sounds.
+
+### Remove Packs
+
+```bash
+peon packs remove glados,murloc
+```
+
+Deletes the specified packs from disk. Cannot remove the currently active pack.
+
+## Pack Rotation
+
+Rotate between multiple packs automatically with each session:
+
+### Rotation Modes
+
+<Tabs>
+  <Tab title="random (Default)">
+    Picks a random pack from the rotation list each session.
+    
+    **Configuration:**
+    ```json
+    {
+      "pack_rotation": ["peon", "glados", "sc_kerrigan"],
+      "pack_rotation_mode": "random"
+    }
+    ```
+    
+    **Set via CLI:**
+    ```bash
+    peon rotation random
+    ```
+  </Tab>
+  
+  <Tab title="round-robin">
+    Cycles through rotation list in order.
+    
+    **Configuration:**
+    ```json
+    {
+      "pack_rotation": ["peon", "peasant", "glados"],
+      "pack_rotation_mode": "round-robin"
+    }
+    ```
+    
+    Session 1: peon → Session 2: peasant → Session 3: glados → Session 1: peon...
+    
+    **Set via CLI:**
+    ```bash
+    peon rotation round-robin
+    ```
+  </Tab>
+  
+  <Tab title="session_override">
+    Manually assign a pack to each session using slash commands.
+    
+    **Configuration:**
+    ```json
+    {
+      "pack_rotation_mode": "session_override"
+    }
+    ```
+    
+    **In Claude Code:**
+    ```
+    /peon-ping-use glados
+    ```
+    
+    **Legacy alias:** `agentskill` mode (same behavior)
+    
+    **Expiration:** Old assignments expire after 7 days (configurable via `session_ttl_days`)
+  </Tab>
+</Tabs>
+
+### Check Current Mode
+
+```bash
+peon rotation
+```
+
+**Output:**
+```
+Pack rotation mode: random
+Rotation list: peon, glados, sc_kerrigan
+```
+
+## Directory-Based Pack Rules
+
+Automatically switch packs based on project directory:
+
+### Path Rules
+
+```json
+{
+  "path_rules": [
+    { "pattern": "*/work/client-a/*", "pack": "glados" },
+    { "pattern": "*/personal/*", "pack": "peon" },
+    { "pattern": "*/services/*", "pack": "sc_battlecruiser" }
+  ]
+}
+```
+
+**Matching:**
+- First matching rule wins
+- Supports `*` and `?` wildcards
+- Overrides `pack_rotation` and `default_pack`
+- Overridden by `session_override` assignments
+
+### Bind Pack to Directory
+
+```bash
+# Bind current directory
+cd ~/work/client-a
+peon packs bind glados
+
+# Bind with pattern
+peon packs bind --pattern "*/services" sc_battlecruiser
+
+# Remove binding for current directory
+peon packs unbind
+
+# List all bindings
+peon packs bindings
+```
+
+**Output of `peon packs bindings`:**
+```
+Directory bindings:
+  */work/client-a/* → glados
+  */personal/* → peon
+  */services/* → sc_battlecruiser
+```
+
+## Pack Priority Hierarchy
+
+When multiple rules apply, PeonPing uses this priority:
+
+1. **Session override** (`/peon-ping-use <pack>`)
+2. **Path rules** (directory pattern matching)
+3. **Pack rotation** (if `pack_rotation` is non-empty)
+4. **Default pack** (`default_pack` config key)
+
+**Fallback behavior:** If a pack is invalid or missing, PeonPing falls back through the hierarchy until it finds a valid pack.
+
+## Creating Custom Packs
+
+Build your own sound pack:
+
+1. **Read the CESP spec:** [openpeon.com/spec](https://openpeon.com/spec)
+2. **Follow the creation guide:** [openpeon.com/create](https://openpeon.com/create)
+3. **See contribution docs:** [CONTRIBUTING.md](https://github.com/PeonPing/peon-ping/blob/main/CONTRIBUTING.md)
+
+### Pack Structure
+
+```
+my-pack/
+├── openpeon.json          # CESP manifest
+├── session.start/
+│   ├── greeting1.wav
+│   └── greeting2.wav
+├── task.complete/
+│   ├── done1.wav
+│   └── done2.wav
+└── task.error/
+    └── error1.wav
+```
+
+### Install Your Pack
+
+```bash
+peon packs install-local ~/my-pack
+peon packs use my-pack
+```
+
+## Interactive Pack Picker
+
+Use the web-based pack picker to generate a custom install command:
+
+**[peonping.com/#picker](https://peonping.com/#picker)**
+
+1. Browse all packs with audio previews
+2. Select your favorites
+3. Get a custom install command:
+   ```bash
+   curl -fsSL https://peonping.com/install | bash -s -- --packs=peon,glados,murloc
+   ```
+
+## Related Configuration
+
+<CardGroup cols={2}>
+  <Card title="Sound Events" icon="bell" href="/features/sound-events">
+    CESP categories and event triggers
+  </Card>
+  <Card title="Notifications" icon="display" href="/features/notifications">
+    Customize notification themes per pack
+  </Card>
+</CardGroup>

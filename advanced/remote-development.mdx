@@ -1,0 +1,198 @@
+---
+title: Remote Development
+description: Use PeonPing with SSH, devcontainers, and GitHub Codespaces via relay server
+---
+
+Coding on a remote server or inside a container? PeonPing auto-detects SSH sessions, devcontainers, and Codespaces, then routes audio and notifications through a lightweight relay running on your local machine.
+
+## How it works
+
+PeonPing detects the runtime environment and routes audio accordingly:
+
+- **SSH** — Detected via `SSH_CONNECTION`/`SSH_CLIENT` env vars → relay at `localhost:19998`
+- **Devcontainer** — Detected via `REMOTE_CONTAINERS` env var → relay at `host.docker.internal:19998`
+- **Codespaces** — Detected via `CODESPACES` env var → relay at `host.docker.internal:19998`
+
+Sounds play on your laptop, not the remote server.
+
+## SSH setup
+
+<Steps>
+  <Step title="Start the relay on your local machine">
+    ```bash
+    peon relay --daemon
+    ```
+    
+    This starts a background HTTP server on port 19998 that receives audio requests from remote sessions.
+  </Step>
+
+  <Step title="Connect with port forwarding">
+    ```bash
+    ssh -R 19998:localhost:19998 your-server
+    ```
+    
+    The `-R` flag forwards port 19998 from the remote back to your local machine.
+  </Step>
+
+  <Step title="Install PeonPing on the remote">
+    ```bash
+    curl -fsSL https://peonping.com/install | bash
+    ```
+    
+    PeonPing auto-detects the SSH session and sends audio requests through the forwarded port.
+  </Step>
+</Steps>
+
+<Note>
+  If PeonPing detects an SSH or container session but can't reach the relay, it prints setup instructions on `SessionStart`.
+</Note>
+
+## Devcontainers / Codespaces
+
+No port forwarding needed — PeonPing auto-detects `REMOTE_CONTAINERS` and `CODESPACES` environment variables and routes audio to `host.docker.internal:19998`.
+
+<Steps>
+  <Step title="Start the relay on your host machine">
+    ```bash
+    peon relay --daemon
+    ```
+  </Step>
+
+  <Step title="Install PeonPing in the container">
+    Add to your `.devcontainer/Dockerfile` or run manually:
+    
+    ```bash
+    curl -fsSL https://peonping.com/install | bash
+    ```
+  </Step>
+</Steps>
+
+The relay automatically resolves `host.docker.internal` to your host machine.
+
+## Relay commands
+
+| Command | Description |
+|---------|-------------|
+| `peon relay` | Start relay in foreground |
+| `peon relay --daemon` | Start in background |
+| `peon relay --stop` | Stop background relay |
+| `peon relay --status` | Check if relay is running |
+| `peon relay --port=12345` | Custom port (default: 19998) |
+| `peon relay --bind=0.0.0.0` | Listen on all interfaces |
+
+<Warning>
+  Using `--bind=0.0.0.0` exposes the relay to your network. Only use this on trusted networks.
+</Warning>
+
+## Environment variables
+
+| Variable | Default | Description |
+|----------|---------|-------------|
+| `PEON_RELAY_PORT` | `19998` | Port to listen on |
+| `PEON_RELAY_BIND` | `127.0.0.1` | Address to bind to |
+| `PEON_RELAY_HOST` | `localhost` | Relay hostname (for clients) |
+| `CLAUDE_PEON_DIR` | `~/.claude/hooks/peon-ping` | PeonPing install directory |
+
+## Relay API
+
+The relay exposes three HTTP endpoints:
+
+### GET /health
+
+Health check. Returns `OK` if relay is running.
+
+```bash
+curl http://localhost:19998/health
+# OK
+```
+
+### GET /play?category=\{category\}
+
+**Recommended.** Play a random sound from a CESP category. The relay picks the sound based on the active pack configured on your local machine.
+
+```bash
+curl "http://localhost:19998/play?category=task.complete"
+# OK: WorkWork.wav
+```
+
+Available categories:
+- `session.start` — Session starts
+- `task.acknowledge` — Task acknowledged
+- `task.complete` — Task finishes
+- `task.error` — Error occurs
+- `input.required` — Permission needed
+- `resource.limit` — Rate/token limit
+- `user.spam` — Rapid prompts
+
+### GET /play?file=\{path\}
+
+**Legacy.** Play a specific sound file (relative to `PEON_DIR`).
+
+```bash
+curl "http://localhost:19998/play?file=packs/peon/sounds/PeonReady1.wav"
+```
+
+<Warning>
+  Path traversal is blocked. Files must be within the PeonPing directory.
+</Warning>
+
+### POST /notify
+
+Send a desktop notification.
+
+```bash
+curl -X POST http://localhost:19998/notify \
+  -H "Content-Type: application/json" \
+  -d '{"title": "Build complete", "message": "Tests passed", "color": "green"}'
+```
+
+## Lightweight remote hooks
+
+If PeonPing isn't installed on the remote, you can create a minimal hook that only sends category names to the relay:
+
+```bash remote-hook.sh
+#!/bin/bash
+RELAY_URL="${PEON_RELAY_URL:-http://127.0.0.1:19998}"
+EVENT=$(cat | python3 -c "import sys,json; d=json.load(sys.stdin); print(d.get('hook_event_name',''))" 2>/dev/null)
+
+case "$EVENT" in
+  SessionStart)      CATEGORY="session.start" ;;
+  Stop)              CATEGORY="task.complete" ;;
+  PermissionRequest) CATEGORY="input.required" ;;
+  *)                 exit 0 ;;
+esac
+
+curl -sf "${RELAY_URL}/play?category=${CATEGORY}" >/dev/null 2>&1 &
+```
+
+Register in `~/.claude/settings.json` on the remote:
+
+```json
+{
+  "hooks": {
+    "SessionStart": [{"command": "bash /path/to/remote-hook.sh"}],
+    "Stop": [{"command": "bash /path/to/remote-hook.sh"}],
+    "PermissionRequest": [{"command": "bash /path/to/remote-hook.sh"}]
+  }
+}
+```
+
+The relay reads your local config to get the active pack and volume, then picks a random sound while avoiding repeats.
+
+## Troubleshooting
+
+### No audio on remote
+
+1. Check relay is running: `peon relay --status`
+2. Test the connection from remote: `curl http://localhost:19998/health`
+3. Check SSH port forwarding: `ssh -R 19998:localhost:19998 ...`
+
+### Container can't reach relay
+
+1. Verify relay is listening: `peon relay --status`
+2. Test from container: `curl http://host.docker.internal:19998/health`
+3. On Linux, use `--bind=0.0.0.0` and connect to host IP instead of `host.docker.internal`
+
+### Sounds play but notifications don't appear
+
+Notifications require the terminal to be unfocused. Desktop popups only show when the terminal isn't the active window.

@@ -1,0 +1,363 @@
+---
+title: Frequently Asked Questions
+description: Common questions about PeonPing setup, usage, and features
+---
+
+<Accordion title="What is PeonPing?">
+PeonPing plays game character voice lines and shows overlay notifications when your AI coding agent needs attention. Instead of tabbing back constantly to check if Claude is done, you hear "Work, work" from the Warcraft Orc Peon (or 165+ other characters) and see a bold banner on every screen.
+
+Works with Claude Code, Cursor, OpenCode, GitHub Copilot, Codex, Amp, and other agentic IDEs via adapters.
+</Accordion>
+
+<Accordion title="Which platforms are supported?">
+- **macOS** — native `afplay`, JXA Cocoa overlays
+- **Linux** — PipeWire, PulseAudio, or ffmpeg backends
+- **Windows** — native PowerShell with `MediaPlayer` and WinForms (no WSL required)
+- **WSL2** — PowerShell audio fallback + Windows toast notifications
+- **MSYS2 / Git Bash** — audio via `ffplay`/`mpv` or PowerShell fallback
+- **SSH / Devcontainers / Codespaces** — audio relay to your local machine
+</Accordion>
+
+<Accordion title="How do I install it?">
+**Homebrew (macOS/Linux, recommended):**
+
+```bash
+brew install PeonPing/tap/peon-ping
+peon-ping-setup
+```
+
+**curl installer (macOS/Linux/WSL):**
+
+```bash
+curl -fsSL https://peonping.com/install | bash
+```
+
+**Windows (PowerShell):**
+
+```powershell
+Invoke-WebRequest -Uri "https://raw.githubusercontent.com/PeonPing/peon-ping/main/install.ps1" -UseBasicParsing | Invoke-Expression
+```
+
+See the [installation guide](/getting-started/installation) for more options.
+</Accordion>
+
+<Accordion title="Do I need WSL on Windows?">
+No! PeonPing has native PowerShell support. The installer, hook scripts, and all audio playback work on native Windows without WSL.
+
+WSL is still supported if you prefer it, but it's not required.
+</Accordion>
+
+<Accordion title="How do I mute sounds during meetings?">
+Two ways:
+
+**In Claude Code:**
+```
+/peon-ping-toggle
+```
+
+**From any terminal:**
+```bash
+peon pause
+```
+
+To unmute:
+```bash
+peon resume
+```
+
+Pausing mutes sounds and desktop notifications instantly. Tab titles remain active. The pause state persists across sessions until you resume.
+</Accordion>
+
+<Accordion title="Can I disable desktop notifications but keep sounds?">
+Yes! Desktop notifications are independent from sounds.
+
+```bash
+peon notifications off
+```
+
+Sounds will continue playing, but visual popups are suppressed. Mobile notifications (if configured) are unaffected.
+
+To re-enable:
+```bash
+peon notifications on
+```
+</Accordion>
+
+<Accordion title="Can I use PeonPing over SSH?">
+Yes! PeonPing auto-detects SSH sessions and routes audio through a relay server on your local machine.
+
+1. **On your local machine:**
+```bash
+peon relay --daemon
+```
+
+2. **SSH with port forwarding:**
+```bash
+ssh -R 19998:localhost:19998 your-server
+```
+
+Sounds and notifications play on your laptop, not the remote server. See [remote development](/features/remote-dev) for details.
+</Accordion>
+
+<Accordion title="How do I switch sound packs?">
+**Switch to a specific pack:**
+
+```bash
+peon packs use glados
+```
+
+**Install and switch in one step:**
+
+```bash
+peon packs use --install glados
+```
+
+**Cycle to the next pack:**
+
+```bash
+peon packs next
+```
+
+**List installed packs:**
+
+```bash
+peon packs list
+```
+
+Browse all available packs with audio previews at [openpeon.com/packs](https://openpeon.com/packs).
+</Accordion>
+
+<Accordion title="How many sound packs are available?">
+165 packs across Warcraft, StarCraft, Red Alert, Portal, Zelda, Dota 2, Helldivers 2, Elder Scrolls, Duke Nukem, and more.
+
+The default install includes 5 curated packs:
+- `peon` (Warcraft III Orc Peon)
+- `peasant` (Warcraft III Human Peasant)
+- `glados` (Portal GLaDOS)
+- `sc_kerrigan` (StarCraft Sarah Kerrigan)
+- `sc_battlecruiser` (StarCraft Battlecruiser)
+
+Install all packs:
+
+```bash
+peon packs install --all
+```
+</Accordion>
+
+<Accordion title="Can I create my own sound pack?">
+Yes! Sound packs use the [CESP (Coding Event Sound Pack Specification)](https://github.com/PeonPing/openpeon) with `openpeon.json` manifests.
+
+1. Create a GitHub repo with `openpeon.json` + sound files
+2. Tag a release (e.g., `v1.0.0`)
+3. Submit to the [OpenPeon registry](https://github.com/PeonPing/registry)
+
+See the [contributing guide](/resources/contributing) and [pack creation guide](https://openpeon.com/create) for step-by-step instructions.
+</Accordion>
+
+<Accordion title="Which IDEs are supported?">
+- **Claude Code** — built-in hooks (primary)
+- **Cursor** — built-in adapter
+- **OpenCode** — native TypeScript plugin
+- **GitHub Copilot** — shell adapter
+- **OpenAI Codex** — shell adapter
+- **Amp** (Sourcegraph) — filesystem watcher
+- **Gemini CLI** — shell adapter
+- **Kilo CLI** — TypeScript plugin (OpenCode fork)
+- **Kiro** (Amazon) — shell adapter
+- **Windsurf** — shell adapter
+- **Kimi Code** (MoonshotAI) — filesystem watcher
+- **Google Antigravity** — filesystem watcher
+- **OpenClaw** — shell adapter
+- **Any MCP client** — Model Context Protocol server
+
+See [IDE adapters](/integrations/ide-adapters) for setup instructions.
+</Accordion>
+
+<Accordion title="What events trigger sounds?">
+| Event | CESP Category | Examples |
+|---|---|---|
+| Session starts | `session.start` | "Ready to work?", "Yes?", "What you want?" |
+| Task finishes | `task.complete` | "Work, work.", "Job's done!", "Okie dokie." |
+| Permission needed | `input.required` | "Something need doing?", "Hmm?" |
+| Tool/command error | `task.error` | "I can't do that.", "Son of a bitch!" |
+| Task acknowledged | `task.acknowledge` | "I read you.", "On it." (disabled by default) |
+| Rate/token limit | `resource.limit` | Pack-dependent |
+| Rapid prompts (3+ in 10s) | `user.spam` | "Me busy, leave me alone!" |
+
+You can disable any category in your config:
+
+```bash
+peon
+# Ask Claude: "Disable session.start sounds"
+```
+</Accordion>
+
+<Accordion title="Can I adjust the volume?">
+Yes! Volume range is 0.0 (silent) to 1.0 (full).
+
+**Set volume:**
+```bash
+peon volume 0.7
+```
+
+**Check current volume:**
+```bash
+peon volume
+```
+
+Or ask Claude:
+```
+/peon-ping-config
+# "Set volume to 0.5"
+```
+</Accordion>
+
+<Accordion title="How do I get mobile push notifications?">
+PeonPing supports **ntfy.sh** (free, no account), **Pushover**, and **Telegram**.
+
+**Quick start with ntfy.sh:**
+
+1. Install the [ntfy app](https://ntfy.sh) on your phone
+2. Subscribe to a unique topic (e.g., `my-peon-notifications`)
+3. Run:
+```bash
+peon mobile ntfy my-peon-notifications
+```
+
+**Pushover:**
+```bash
+peon mobile pushover <user_key> <app_token>
+```
+
+**Telegram:**
+```bash
+peon mobile telegram <bot_token> <chat_id>
+```
+
+Test it:
+```bash
+peon mobile test
+```
+
+See [mobile notifications](/features/mobile-notifications) for setup details.
+</Accordion>
+
+<Accordion title="What's the difference between overlay and standard notifications?">
+PeonPing supports two notification styles:
+
+**Overlay (default):**
+- Large, visible banners that appear on all screens
+- macOS: JXA Cocoa overlay
+- Windows/WSL/MSYS2: Windows Forms popup
+- Clicking focuses your terminal (supports Ghostty, Warp, iTerm2, Zed, Terminal.app)
+
+**Standard:**
+- System notifications via `terminal-notifier` (macOS) or Windows toast (WSL/MSYS2)
+- Smaller, less intrusive
+- Clicking focuses your terminal if `terminal-notifier` is installed (`brew install terminal-notifier`)
+
+Switch styles:
+```bash
+peon notifications overlay   # large banners (default)
+peon notifications standard  # system notifications
+```
+</Accordion>
+
+<Accordion title="Can I use different packs for different projects?">
+Yes! Use `path_rules` to assign packs based on working directory.
+
+**Bind a pack to the current directory:**
+```bash
+peon packs bind glados
+```
+
+**Bind to a pattern:**
+```bash
+peon packs bind --pattern "*/work/client-a/*" glados
+```
+
+**List all bindings:**
+```bash
+peon packs bindings
+```
+
+**Remove current directory binding:**
+```bash
+peon packs unbind
+```
+
+Or edit `~/.claude/hooks/peon-ping/config.json` directly:
+
+```json
+{
+  "path_rules": [
+    { "pattern": "*/work/client-a/*", "pack": "glados" },
+    { "pattern": "*/personal/*", "pack": "peon" }
+  ]
+}
+```
+</Accordion>
+
+<Accordion title="What's the CESP standard?">
+CESP (Coding Event Sound Pack Specification) is an open standard for mapping coding events to sounds that any agentic IDE can adopt.
+
+PeonPing implements CESP v1.0. Sound packs use `openpeon.json` manifests that map events to audio files.
+
+Read the full spec: [openpeon.com/spec](https://openpeon.com/spec)
+</Accordion>
+
+<Accordion title="Does PeonPing work with the MCP (Model Context Protocol)?">
+Yes! PeonPing includes an MCP server so any MCP client can play sounds directly via tool calls — no hooks required.
+
+The agent chooses the sound instead of automatically playing a fixed sound on every event.
+
+**Setup:**
+
+Add to your MCP client config (Claude Desktop, Cursor, etc.):
+
+```json
+{
+  "mcpServers": {
+    "peon-ping": {
+      "command": "node",
+      "args": ["/path/to/peon-ping/mcp/peon-mcp.js"]
+    }
+  }
+}
+```
+
+See [MCP integration](/integrations/mcp-server) for details.
+</Accordion>
+
+<Accordion title="How do I uninstall PeonPing?">
+**macOS/Linux:**
+
+```bash
+bash ~/.claude/hooks/peon-ping/uninstall.sh
+```
+
+**Windows (PowerShell):**
+
+```powershell
+powershell -File "$env:USERPROFILE\.claude\hooks\peon-ping\uninstall.ps1"
+```
+
+**Keep sound packs (Windows):**
+
+```powershell
+powershell -File "$env:USERPROFILE\.claude\hooks\peon-ping\uninstall.ps1" -KeepSounds
+```
+
+The uninstaller removes hooks from `settings.json`, CLI shortcuts, and optionally sound packs.
+</Accordion>
+
+<Accordion title="Is PeonPing open source?">
+Yes! PeonPing is MIT licensed and open source.
+
+- **Main repo:** [github.com/PeonPing/peon-ping](https://github.com/PeonPing/peon-ping)
+- **Registry:** [github.com/PeonPing/registry](https://github.com/PeonPing/registry)
+- **Official packs:** [github.com/PeonPing/og-packs](https://github.com/PeonPing/og-packs)
+- **CESP spec:** [github.com/PeonPing/openpeon](https://github.com/PeonPing/openpeon)
+
+Contributions welcome!
+</Accordion>

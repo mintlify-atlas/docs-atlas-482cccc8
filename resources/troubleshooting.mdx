@@ -1,0 +1,302 @@
+---
+title: Troubleshooting
+description: Common issues and solutions for PeonPing
+---
+
+## No sounds playing
+
+### Check if PeonPing is paused
+
+PeonPing might be muted. Check the status:
+
+```bash
+peon status
+```
+
+If paused, resume with:
+
+```bash
+peon resume
+```
+
+### Verify audio backend
+
+**macOS:**
+- `afplay` is built-in and should work automatically
+- Test manually: `afplay ~/.claude/hooks/peon-ping/packs/peon/sounds/PeonReady1.wav`
+
+**Linux:**
+PeonPing tries multiple backends in order: `pw-play` → `paplay` → `ffplay` → `mpv` → `play` → `aplay`
+
+Install at least one:
+
+```bash
+# PipeWire (recommended for modern Linux)
+sudo apt install pipewire-pulse
+
+# PulseAudio (older systems)
+sudo apt install pulseaudio-utils
+
+# ffmpeg (fallback)
+sudo apt install ffmpeg
+```
+
+**Windows:**
+- Native PowerShell uses `MediaPlayer` (built-in, no dependencies)
+- WSL uses PowerShell fallback or Linux audio backends
+
+### Check sound pack installation
+
+Verify packs are installed:
+
+```bash
+peon packs list
+```
+
+If empty, install the default packs:
+
+```bash
+peon packs install peon,peasant,glados,sc_kerrigan,sc_battlecruiser
+```
+
+## Hooks not triggering
+
+### Verify hook registration
+
+Check if hooks are registered in Claude Code settings:
+
+```bash
+cat ~/.claude/settings.json | grep peon-ping
+```
+
+You should see entries for `SessionStart`, `Stop`, `PermissionRequest`, etc.
+
+If missing, re-run setup:
+
+```bash
+peon-ping-setup   # Homebrew install
+# OR
+bash ~/.claude/hooks/peon-ping/install.sh  # Manual install
+```
+
+### Check permissions
+
+Ensure `peon.sh` is executable:
+
+```bash
+chmod +x ~/.claude/hooks/peon-ping/peon.sh
+```
+
+### Verify Claude Code version
+
+PeonPing requires Claude Code with hooks support. Update to the latest version if sounds aren't working.
+
+## Remote development issues
+
+### SSH: No sounds in remote sessions
+
+PeonPing auto-detects SSH sessions and routes audio through a relay server on your local machine.
+
+1. **Start the relay on your local machine:**
+
+```bash
+peon relay --daemon
+```
+
+2. **SSH with port forwarding:**
+
+```bash
+ssh -R 19998:localhost:19998 your-server
+```
+
+3. **Verify relay is running:**
+
+```bash
+peon relay --status
+```
+
+If the relay isn't reachable from the remote host, PeonPing prints setup instructions on `SessionStart`.
+
+### Devcontainers/Codespaces: No sounds
+
+No SSH forwarding needed — PeonPing auto-detects container environments.
+
+Just run the relay on your host:
+
+```bash
+peon relay --daemon
+```
+
+The container automatically routes audio to `host.docker.internal:19998`.
+
+## Desktop notifications not showing
+
+### Check notification settings
+
+Verify desktop notifications are enabled:
+
+```bash
+peon status
+```
+
+If disabled:
+
+```bash
+peon notifications on
+```
+
+### macOS: Overlay notifications not appearing
+
+Ensure `mac-overlay.js` exists:
+
+```bash
+ls ~/.claude/hooks/peon-ping/scripts/mac-overlay.js
+```
+
+If missing, reinstall:
+
+```bash
+brew reinstall peon-ping
+# OR
+bash <(curl -fsSL https://raw.githubusercontent.com/PeonPing/peon-ping/main/install.sh)
+```
+
+Fall back to standard notifications if needed:
+
+```bash
+peon notifications standard
+```
+
+### Linux: `notify-send` not installed
+
+Install notification support:
+
+```bash
+sudo apt install libnotify-bin  # Debian/Ubuntu
+sudo dnf install libnotify       # Fedora
+```
+
+## Volume too quiet or too loud
+
+Adjust volume (0.0 = silent, 1.0 = full):
+
+```bash
+peon volume 0.7
+```
+
+Check current volume:
+
+```bash
+peon volume
+```
+
+## Wrong pack playing
+
+Check which pack is active:
+
+```bash
+peon status
+```
+
+Switch to a specific pack:
+
+```bash
+peon packs use glados
+```
+
+If using pack rotation, check the rotation list in your config:
+
+```bash
+cat ~/.claude/hooks/peon-ping/config.json | grep pack_rotation
+```
+
+## Sounds playing twice or repeatedly
+
+### Multiple installs detected
+
+You might have both global and local installs. Check for:
+
+- `~/.claude/hooks/peon-ping/` (global)
+- `./.claude/hooks/peon-ping/` (project-local)
+
+Remove one to avoid conflicts.
+
+### Duplicate hooks in settings.json
+
+Check for duplicate entries:
+
+```bash
+grep -c "peon.sh" ~/.claude/settings.json
+```
+
+If you see duplicates, manually edit `~/.claude/settings.json` and remove the extras.
+
+## Windows-specific issues
+
+### PowerShell execution policy error
+
+If you see "running scripts is disabled," set the execution policy:
+
+```powershell
+Set-ExecutionPolicy -Scope CurrentUser RemoteSigned
+```
+
+### Sounds work but notifications don't appear
+
+Windows toast notifications require Windows 10+. On WSL, notifications use Windows Forms overlays which require an X server or WSLg (Windows 11).
+
+### Git Bash / MSYS2: Audio playback fails
+
+Install a compatible player:
+
+```bash
+pacman -S mingw-w64-x86_64-ffmpeg  # MSYS2
+```
+
+Or let PeonPing fall back to native PowerShell audio (automatic).
+
+## Subagent sessions too noisy
+
+When Claude Code's Task tool spawns sub-agents, each completion fires a sound. Suppress sub-agent sounds:
+
+```bash
+peon
+# Ask Claude: "Enable suppress_subagent_complete"
+```
+
+Or manually edit `~/.claude/hooks/peon-ping/config.json`:
+
+```json
+{
+  "suppress_subagent_complete": true
+}
+```
+
+## Spam detection triggering incorrectly
+
+The `user.spam` easter egg fires when you send 3+ prompts in 10 seconds.
+
+Disable it:
+
+```json
+{
+  "categories": {
+    "user.spam": false
+  }
+}
+```
+
+Or adjust the threshold:
+
+```json
+{
+  "annoyed_threshold": 5,
+  "annoyed_window_seconds": 10
+}
+```
+
+## Need more help?
+
+Report issues on GitHub: [github.com/PeonPing/peon-ping/issues](https://github.com/PeonPing/peon-ping/issues)
+
+Join the discussion: [@peonping on X](https://x.com/peonping)

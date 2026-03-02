@@ -1,0 +1,396 @@
+---
+title: Notifications
+description: Configure desktop and mobile notifications including positioning, styling, templates, and push notification services.
+---
+
+PeonPing sends visual notifications on desktop and mobile when tasks finish or need attention.
+
+## Desktop Notifications
+
+<ParamField path="desktop_notifications" type="boolean" default="true">
+  Enable or disable desktop notification popups.
+  
+  When `false`, sounds continue playing but visual popups are suppressed. Mobile notifications are unaffected.
+</ParamField>
+
+**CLI commands:**
+
+```bash
+peon notifications on         # Enable desktop popups
+peon notifications off        # Disable desktop popups
+peon popups off               # Alias for 'notifications off'
+peon notifications test       # Send a test notification
+```
+
+**Example:**
+
+```json
+{
+  "desktop_notifications": true
+}
+```
+
+## Notification Style
+
+<ParamField path="notification_style" type="string" default="overlay">
+  Controls how desktop notifications appear.
+  
+  **Options:**
+  - `"overlay"` — Large, visible banners using native OS APIs (JXA Cocoa overlay on macOS, Windows Forms popup on WSL/MSYS2). Clicking focuses your terminal.
+  - `"standard"` — System notifications using `terminal-notifier` / `osascript` on macOS, Windows toast on WSL/MSYS2.
+  
+  Overlay notifications appear **on all screens** and are more visible than standard system notifications.
+</ParamField>
+
+**CLI commands:**
+
+```bash
+peon notifications overlay    # Use large overlay banners
+peon notifications standard   # Use system notifications
+```
+
+**Example:**
+
+```json
+{
+  "notification_style": "overlay"
+}
+```
+
+<Tip>
+On macOS, install `terminal-notifier` for richer standard notifications:
+
+```bash
+brew install terminal-notifier
+```
+
+With `terminal-notifier`, clicking a standard notification automatically focuses your terminal (supports Ghostty, Warp, iTerm2, Zed, Terminal.app).
+</Tip>
+
+## Overlay Theme (macOS)
+
+<ParamField path="overlay_theme" type="string" default="null">
+  Choose a visual theme for overlay notifications on macOS.
+  
+  **Options:**
+  - `"jarvis"` — Circular HUD with rotating arcs, graduation ticks, and progress ring
+  - `"glass"` — Glassmorphism panel with accent color bar, progress line, and timestamp
+  - `"sakura"` — Zen garden with bonsai tree and animated cherry blossom petals
+  - Omit or set to `null` for the default overlay theme
+  
+  **macOS only.**
+</ParamField>
+
+**Example:**
+
+```json
+{
+  "notification_style": "overlay",
+  "overlay_theme": "jarvis"
+}
+```
+
+## Notification Position
+
+<ParamField path="notification_position" type="string" default="top-center">
+  Where overlay notifications appear on screen.
+  
+  **Options:**
+  - `"top-left"`
+  - `"top-center"`
+  - `"top-right"`
+  - `"bottom-left"`
+  - `"bottom-center"`
+  - `"bottom-right"`
+</ParamField>
+
+**CLI commands:**
+
+```bash
+peon notifications position              # Show current position
+peon notifications position top-right    # Set to top-right
+```
+
+**Example:**
+
+```json
+{
+  "notification_position": "top-right"
+}
+```
+
+## Auto-Dismiss Time
+
+<ParamField path="notification_dismiss_seconds" type="number" default="4">
+  Auto-dismiss overlay notifications after N seconds.
+  
+  Set to `0` for persistent notifications that require a click to dismiss.
+</ParamField>
+
+**CLI commands:**
+
+```bash
+peon notifications dismiss        # Show current dismiss time
+peon notifications dismiss 6      # Set to 6 seconds
+peon notifications dismiss 0      # Persistent (click to dismiss)
+```
+
+**Example:**
+
+```json
+{
+  "notification_dismiss_seconds": 6
+}
+```
+
+## Notification Title Override
+
+<ParamField path="notification_title_override" type="string" default="">
+  Override the project name shown in notification titles.
+  
+  When empty, the project name is auto-detected from:
+  1. `.peon-label` file in project root
+  2. `project_name_map` config key
+  3. Git repository name
+  4. Directory name
+  
+  Set a custom label to override auto-detection.
+</ParamField>
+
+**CLI commands:**
+
+```bash
+peon notifications label                  # Show current label
+peon notifications label "My Project"     # Set custom label
+peon notifications label reset            # Clear override
+```
+
+**Example:**
+
+```json
+{
+  "notification_title_override": "Client Portal"
+}
+```
+
+## Project Name Map
+
+<ParamField path="project_name_map" type="object" default="{}">
+  Map directory paths to custom project labels for notifications.
+  
+  Keys are path patterns (exact paths, not globs). Values are display names.
+  
+  Checked **before** falling back to git repo name or directory name, but **after** `notification_title_override`.
+</ParamField>
+
+**Example:**
+
+```json
+{
+  "project_name_map": {
+    "/home/user/work/client-a": "Client A",
+    "/home/user/work/client-b": "Client B",
+    "/home/user/personal/side-project": "Side Project"
+  }
+}
+```
+
+## Notification Templates
+
+<ParamField path="notification_templates" type="object" default="{}">
+  Custom message format strings for notification events.
+  
+  **Keys:**
+  - `stop` — Task completion
+  - `permission` — Permission request
+  - `error` — Tool/command error
+  - `idle` — Session idle
+  - `question` — Agent needs input
+  
+  **Available variables:**
+  - `{project}` — Project name
+  - `{summary}` — Event summary
+  - `{tool_name}` — Tool name (for permission events)
+  - `{status}` — Event status
+  - `{event}` — Event type
+  
+  When a template is not set, the default is `"{project}"`.
+</ParamField>
+
+**CLI commands:**
+
+```bash
+peon notifications template                          # Show all templates
+peon notifications template stop                     # Show single template
+peon notifications template stop "{project}: done"   # Set template
+peon notifications template --reset                  # Clear all templates
+```
+
+**Example:**
+
+```json
+{
+  "notification_templates": {
+    "stop": "{project}: {summary}",
+    "permission": "{project}: {tool_name} needs approval",
+    "error": "{project}: error in {tool_name}",
+    "idle": "{project}: waiting for input",
+    "question": "{project}: {summary}"
+  }
+}
+```
+
+## Mobile Notifications
+
+<ParamField path="mobile_notify" type="object" default="{}">
+  Configuration for push notifications to your phone.
+  
+  Supports three services:
+  - **ntfy.sh** (free, no account needed)
+  - **Pushover** (paid, one-time fee)
+  - **Telegram** (free, requires bot setup)
+  
+  Mobile notifications fire on every event regardless of window focus. They're independent from desktop notifications and sounds.
+</ParamField>
+
+### ntfy.sh (Free)
+
+**CLI setup:**
+
+```bash
+peon mobile ntfy my-peon-notifications
+```
+
+**Manual config:**
+
+```json
+{
+  "mobile_notify": {
+    "enabled": true,
+    "service": "ntfy",
+    "topic": "my-peon-notifications",
+    "server": "https://ntfy.sh",
+    "token": ""
+  }
+}
+```
+
+<ParamField path="mobile_notify.enabled" type="boolean" default="true">
+  Enable or disable mobile push notifications.
+</ParamField>
+
+<ParamField path="mobile_notify.service" type="string">
+  Push notification service to use.
+  
+  **Options:**
+  - `"ntfy"` — ntfy.sh
+  - `"pushover"` — Pushover
+  - `"telegram"` — Telegram
+</ParamField>
+
+<ParamField path="mobile_notify.topic" type="string">
+  ntfy.sh topic name.
+  
+  Choose a unique topic (e.g., `my-peon-notifications`) and subscribe to it in the [ntfy mobile app](https://ntfy.sh).
+  
+  **ntfy only.**
+</ParamField>
+
+<ParamField path="mobile_notify.server" type="string" default="https://ntfy.sh">
+  ntfy server URL.
+  
+  Use `https://ntfy.sh` for the public server, or specify a self-hosted instance.
+  
+  **ntfy only.**
+</ParamField>
+
+<ParamField path="mobile_notify.token" type="string" default="">
+  ntfy authentication token (optional).
+  
+  Required if your topic is protected with ACLs. Leave empty for public topics.
+  
+  **ntfy only.**
+</ParamField>
+
+### Pushover
+
+**CLI setup:**
+
+```bash
+peon mobile pushover <user_key> <app_token>
+```
+
+**Manual config:**
+
+```json
+{
+  "mobile_notify": {
+    "enabled": true,
+    "service": "pushover",
+    "user_key": "your-user-key",
+    "app_token": "your-app-token"
+  }
+}
+```
+
+<ParamField path="mobile_notify.user_key" type="string">
+  Pushover user key.
+  
+  Find this in your [Pushover dashboard](https://pushover.net).
+  
+  **Pushover only.**
+</ParamField>
+
+<ParamField path="mobile_notify.app_token" type="string">
+  Pushover application token.
+  
+  Create an application in your [Pushover dashboard](https://pushover.net/apps/build) to get a token.
+  
+  **Pushover only.**
+</ParamField>
+
+### Telegram
+
+**CLI setup:**
+
+```bash
+peon mobile telegram <bot_token> <chat_id>
+```
+
+**Manual config:**
+
+```json
+{
+  "mobile_notify": {
+    "enabled": true,
+    "service": "telegram",
+    "bot_token": "your-bot-token",
+    "chat_id": "your-chat-id"
+  }
+}
+```
+
+<ParamField path="mobile_notify.bot_token" type="string">
+  Telegram bot token.
+  
+  Create a bot via [@BotFather](https://t.me/BotFather) to get a token.
+  
+  **Telegram only.**
+</ParamField>
+
+<ParamField path="mobile_notify.chat_id" type="string">
+  Telegram chat ID.
+  
+  Send a message to your bot and visit `https://api.telegram.org/bot<token>/getUpdates` to find your chat ID.
+  
+  **Telegram only.**
+</ParamField>
+
+### Mobile CLI Commands
+
+```bash
+peon mobile on                # Enable mobile notifications
+peon mobile off               # Disable mobile notifications
+peon mobile status            # Show current config
+peon mobile test              # Send a test notification
+```

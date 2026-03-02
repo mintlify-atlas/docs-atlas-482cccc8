@@ -1,0 +1,132 @@
+---
+title: MCP Server Overview
+description: Model Context Protocol server for agent-controlled sound playback
+---
+
+# MCP Server Overview
+
+PeonPing includes a [Model Context Protocol (MCP)](https://modelcontextprotocol.io/) server that allows AI agents to play sounds directly via tool calls — no hooks required.
+
+## Key Difference: Agent-Controlled Sounds
+
+Instead of automatically playing a fixed sound on every event, the **agent chooses exactly what to play**:
+
+- `duke_nukem/SonOfABitch` when a build fails
+- `sc_kerrigan/IReadYou` when reading files
+- `glados/YouMonster` when the user makes a mistake
+
+The agent has full context about what happened and picks the most appropriate sound.
+
+## Capabilities
+
+<CardGroup cols={2}>
+  <Card title="play_sound Tool" icon="play" href="/api/mcp-tools">
+    Play one or more sounds by key (e.g., `peon/PeonReady1`)
+  </Card>
+  <Card title="Catalog Resource" icon="book" href="/api/mcp-resources">
+    Full pack catalog prefetched once (no repeated tool calls)
+  </Card>
+</CardGroup>
+
+## Setup
+
+Add to your MCP client config (Claude Desktop, Cursor, etc.):
+
+```json
+{
+  "mcpServers": {
+    "peon-ping": {
+      "command": "node",
+      "args": ["/path/to/peon-ping/mcp/peon-mcp.js"]
+    }
+  }
+}
+```
+
+### Homebrew Install
+
+If installed via Homebrew:
+
+```json
+{
+  "mcpServers": {
+    "peon-ping": {
+      "command": "node",
+      "args": ["$(brew --prefix peon-ping)/libexec/mcp/peon-mcp.js"]
+    }
+  }
+}
+```
+
+### Requirements
+
+- **Node.js 18+** (for MCP SDK)
+- **peon-ping installed** (sound packs in `~/.openpeon/packs/` or `~/.claude/hooks/peon-ping/packs/`)
+
+## How It Works
+
+1. **Client starts MCP server** — spawns `peon-mcp.js` via stdio transport
+2. **Agent reads catalog** — prefetches `peon-ping://catalog` resource (once per session)
+3. **Agent picks sound** — calls `play_sound` tool with specific sound key
+4. **Server plays audio** — uses native audio backend (afplay, PipeWire, PulseAudio, etc.)
+
+## Example Agent Behavior
+
+When the agent encounters an error:
+
+```typescript
+// Agent reads error message
+tool_use: {
+  tool: "bash",
+  command: "npm test"
+}
+
+// Exit code 1, tests failed
+result: {
+  exit_code: 1,
+  stderr: "FAIL tests/app.test.ts"
+}
+
+// Agent picks appropriate sound
+tool_use: {
+  tool: "play_sound",
+  sound: "duke_nukem/SonOfABitch"
+}
+```
+
+## Platform Support
+
+| Platform | Audio Backend |
+|---|---|
+| macOS | `afplay` (built-in) or `peon-play` (Sound Effects device routing) |
+| Linux | PipeWire (`pw-play`), PulseAudio (`paplay`), ffplay, mpv, aplay |
+| Windows/WSL2 | PowerShell `MediaPlayer` |
+
+## Configuration
+
+The MCP server reads volume and pack settings from:
+
+1. `~/.claude/hooks/peon-ping/config.json` (if exists)
+2. `~/.openpeon/config.json` (fallback)
+
+Environment variables:
+
+<ParamField path="PEON_VOLUME" type="number" default="0.5">
+  Override config volume (0.0–1.0)
+</ParamField>
+
+<ParamField path="PEON_PACKS_DIR" type="string">
+  Custom packs directory (defaults to `~/.openpeon/packs/`)
+</ParamField>
+
+## Limitations
+
+- **No automatic event detection** — the agent must explicitly call `play_sound`
+- **Requires MCP support** — only works with MCP-compatible clients
+- **No hooks** — does not integrate with IDE hooks (use `peon.sh` for that)
+
+## See Also
+
+- [MCP Tools](/api/mcp-tools) — `play_sound` parameters and examples
+- [MCP Resources](/api/mcp-resources) — catalog and pack resources
+- [MCP README](https://github.com/PeonPing/peon-ping/blob/main/mcp/README.md) — full setup guide

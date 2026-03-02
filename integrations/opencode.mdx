@@ -1,0 +1,175 @@
+---
+title: 'OpenCode'
+description: 'Native TypeScript plugin with full CESP v1.0 support'
+---
+
+PeonPing for OpenCode is a native TypeScript plugin that hooks into OpenCode's event bus. It provides the richest integration of all adapters: sound playback, desktop notifications, terminal focus detection, tab titles, and pack rotation.
+
+## Setup
+
+<Steps>
+  <Step title="Install the plugin">
+    ```bash
+    curl -fsSL https://raw.githubusercontent.com/PeonPing/peon-ping/main/adapters/opencode.sh | bash
+    ```
+
+    Or if you already have PeonPing installed:
+
+    ```bash
+    bash ~/.claude/hooks/peon-ping/adapters/opencode.sh
+    ```
+  </Step>
+
+  <Step title="Restart OpenCode">
+    The plugin activates on next launch. You'll hear a greeting sound when OpenCode starts.
+  </Step>
+</Steps>
+
+## How It Works
+
+The installer:
+
+1. Downloads `peon-ping.ts` to `~/.config/opencode/plugins/`
+2. Creates `~/.config/opencode/peon-ping/config.json`
+3. Installs the default sound pack (`peon`) from the registry to `~/.openpeon/packs/`
+
+On OpenCode launch, the plugin:
+
+1. Loads the active pack's `openpeon.json` manifest
+2. Subscribes to OpenCode events (`session.created`, `session.idle`, `session.error`, `permission.asked`)
+3. Maps events to CESP categories and plays sounds
+4. Updates terminal tab titles (`● project: working...` / `✓ project: done`)
+5. Sends desktop notifications when the terminal is not focused
+
+## Event Mapping
+
+| OpenCode Event | CESP Category | Trigger |
+|----------------|---------------|---------|
+| Plugin init / `session.created` | `session.start` | OpenCode launches, session starts |
+| `session.status` (busy) | `task.acknowledge` | Agent accepts work |
+| `session.idle` | `task.complete` | Agent finishes turn |
+| `session.error` | `task.error` | Error occurs |
+| `permission.asked` | `input.required` | Permission prompt |
+| Rapid prompts detected | `user.spam` | 3+ prompts in 10 seconds |
+
+## Features
+
+### Terminal Focus Detection
+
+Desktop notifications only appear when your terminal is **not** the frontmost app. The plugin uses AppleScript to check focus:
+
+```typescript
+const focused = await isTerminalFocused()
+if (!focused) {
+  sendNotification(...)
+}
+```
+
+Supported terminals: Terminal.app, iTerm2, Warp, Alacritty, kitty, WezTerm, ghostty, Hyper.
+
+### Tab Titles
+
+The plugin updates your terminal tab to show task status:
+
+- `project: ready` — Session started
+- `project: working` — Agent is busy
+- `● project: done` — Task complete
+- `✗ project: error` — Error occurred
+
+### Subagent Filtering
+
+OpenCode's Task tool spawns parallel subagents. Each subagent has a `parentID` field. The plugin tracks subagent session IDs and skips sounds for them:
+
+```typescript
+if (event.properties?.info?.parentID) {
+  subagentSessionIds.add(event.properties.info.id)
+}
+
+if (isSubagent(sessionID)) {
+  return // Skip sound
+}
+```
+
+### Pack Rotation
+
+Per-session pack rotation:
+
+```json
+{
+  "pack_rotation": ["peon", "glados", "sc_kerrigan"],
+  "pack_rotation_mode": "random"
+}
+```
+
+Each OpenCode session picks a random pack from the rotation.
+
+### SSH & Devcontainer Support
+
+When running in SSH or devcontainers, the plugin detects the environment and routes audio/notifications to a relay on your local machine:
+
+```typescript
+const platform = detectPlatform() // "ssh" | "devcontainer" | "mac" | "linux"
+if (platform === "ssh" || platform === "devcontainer") {
+  const relay = getRelayConfig(config, platform)
+  fetch(`http://${relay.host}:${relay.port}/play?file=...`)
+}
+```
+
+See [Remote Development](/remote-dev) for relay setup.
+
+## Configuration
+
+Config path: `~/.config/opencode/peon-ping/config.json`
+
+```json
+{
+  "active_pack": "peon",
+  "volume": 0.5,
+  "enabled": true,
+  "desktop_notifications": true,
+  "categories": {
+    "session.start": true,
+    "task.complete": true,
+    "task.error": true,
+    "input.required": true,
+    "user.spam": true
+  },
+  "spam_threshold": 3,
+  "spam_window_seconds": 10,
+  "pack_rotation": [],
+  "debounce_ms": 500
+}
+```
+
+See [Configuration](/configuration/overview) for all options.
+
+## Custom Notification Icon
+
+By default, `terminal-notifier` shows a generic Terminal icon. You can replace it with the peon icon:
+
+```bash
+brew install terminal-notifier
+bash ~/.claude/hooks/peon-ping/adapters/opencode/setup-icon.sh
+```
+
+The script:
+
+1. Finds the peon icon (`peon-icon.png`)
+2. Converts it to `.icns` using built-in macOS tools (`sips` + `iconutil`)
+3. Backs up the original `Terminal.icns`
+4. Replaces it with the peon icon
+
+Re-run after `brew upgrade terminal-notifier`.
+
+<Note>
+  **Future migration:** When [jamf/Notifier](https://github.com/jamf/Notifier) is available via Homebrew, the plugin will migrate to it. Notifier uses the modern UserNotifications framework and has built-in `--rebrand` support.
+</Note>
+
+## Uninstall
+
+```bash
+rm -f ~/.config/opencode/plugins/peon-ping.ts
+rm -rf ~/.config/opencode/peon-ping
+```
+
+Sound packs in `~/.openpeon/packs/` are preserved (shared with other adapters).

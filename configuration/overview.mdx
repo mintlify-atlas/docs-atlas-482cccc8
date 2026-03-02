@@ -1,0 +1,154 @@
+---
+title: Configuration Overview
+description: Learn where PeonPing stores configuration and how to edit settings using CLI commands or slash commands in Claude Code.
+---
+
+PeonPing configuration is stored in a JSON file that controls sounds, notifications, pack rotation, and all other behavior.
+
+## Config File Location
+
+The location depends on your installation mode:
+
+### Global Install (Default)
+
+```
+~/.claude/hooks/peon-ping/config.json
+```
+
+or if you have a custom `CLAUDE_CONFIG_DIR`:
+
+```
+$CLAUDE_CONFIG_DIR/hooks/peon-ping/config.json
+```
+
+### Local Install (Project-Specific)
+
+```
+./.claude/hooks/peon-ping/config.json
+```
+
+Local config files take precedence over global config when present in the current working directory.
+
+## Editing Configuration
+
+You have three ways to change settings:
+
+### 1. Slash Commands (Claude Code)
+
+While working in Claude Code, use the `/peon-ping-config` slash command to change any setting:
+
+```
+/peon-ping-config
+```
+
+Then ask Claude to change settings for you:
+- "Set volume to 0.3"
+- "Enable round-robin pack rotation"
+- "Add glados to my pack rotation"
+- "Disable session.start sounds"
+
+### 2. CLI Commands
+
+From any terminal, use the `peon` command:
+
+```bash
+peon volume 0.7              # Set volume
+peon rotation random         # Set rotation mode
+peon notifications off       # Disable desktop popups
+peon packs use glados        # Switch to a pack
+```
+
+See the [CLI reference](/cli/overview) for all available commands.
+
+### 3. Manual Editing
+
+You can directly edit `config.json` with any text editor. The file is standard JSON with no special syntax.
+
+```bash
+# Global config
+vim ~/.claude/hooks/peon-ping/config.json
+
+# Local config
+vim .claude/hooks/peon-ping/config.json
+```
+
+Changes take effect immediately on the next hook event.
+
+## Configuration Structure
+
+The config file is organized into sections:
+
+```json
+{
+  "volume": 0.5,
+  "enabled": true,
+  "desktop_notifications": true,
+  "default_pack": "peon",
+  "pack_rotation": [],
+  "pack_rotation_mode": "random",
+  "path_rules": [],
+  "categories": {
+    "session.start": true,
+    "task.complete": true,
+    "task.error": true,
+    "input.required": true,
+    "resource.limit": true,
+    "user.spam": true
+  },
+  "notification_position": "top-center",
+  "notification_dismiss_seconds": 4,
+  "headphones_only": false,
+  "meeting_detect": false
+}
+```
+
+## Configuration Sections
+
+<CardGroup cols={2}>
+  <Card title="Sound Control" icon="volume" href="/configuration/sound-control">
+    Volume, enable/disable, headphones-only mode, meeting detection
+  </Card>
+  <Card title="Notifications" icon="bell" href="/configuration/notifications">
+    Desktop/mobile notifications, positioning, templates, styling
+  </Card>
+  <Card title="Pack Rotation" icon="shuffle" href="/configuration/pack-rotation">
+    Rotation modes, path rules, session overrides
+  </Card>
+  <Card title="Categories" icon="filter" href="/configuration/categories">
+    Toggle individual sound categories on/off
+  </Card>
+</CardGroup>
+
+## Config Migration
+
+When you update PeonPing, new config keys are automatically backfilled with defaults. Your existing settings are preserved.
+
+Legacy keys are automatically migrated:
+- `active_pack` → `default_pack`
+- `agentskill` mode → `session_override` mode
+
+## Multiple Configs
+
+You can maintain both global and local configs:
+
+- **Global**: Used by default in all projects
+- **Local**: Project-specific overrides (created with `--local` or `--init-local-config` installer flags)
+
+When a local config exists, it completely replaces the global config for that project directory.
+
+## Nix/Home Manager
+
+If you installed via Nix Home Manager, your config is managed declaratively:
+
+```nix
+programs.peon-ping = {
+  enable = true;
+  settings = {
+    default_pack = "glados";
+    volume = 0.7;
+    enabled = true;
+  };
+};
+```
+
+The CLI will detect this and show instructions if you try to modify the config file directly.

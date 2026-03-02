@@ -1,0 +1,247 @@
+---
+title: Relay HTTP Endpoints
+description: HTTP API reference for the peon-ping relay server
+---
+
+# Relay HTTP Endpoints
+
+The relay server exposes three HTTP endpoints for health checks, audio playback, and notifications.
+
+## GET /health
+
+Health check endpoint.
+
+### Request
+
+```bash
+curl http://localhost:19998/health
+```
+
+### Response
+
+**Status:** `200 OK`
+
+**Content-Type:** `text/plain`
+
+**Body:**
+
+```
+OK
+```
+
+### Use Case
+
+Remote hooks check if the relay is reachable before sending audio/notification requests:
+
+```bash
+if curl -sf http://localhost:19998/health >/dev/null 2>&1; then
+  # Relay available, send audio request
+else
+  # No relay, skip audio
+fi
+```
+
+---
+
+## GET /play
+
+Play a sound file or pick a random sound from a category.
+
+### Parameters
+
+<ParamField query="file" type="string">
+  **Legacy mode:** Relative path to sound file (e.g., `packs/peon/sounds/PeonReady1.wav`). Mutually exclusive with `category`.
+</ParamField>
+
+<ParamField query="category" type="string">
+  **Category mode (recommended):** CESP category name (e.g., `session.start`, `task.complete`, `input.required`). The relay picks a random sound from the active pack's category. Mutually exclusive with `file`.
+</ParamField>
+
+### Headers
+
+<ParamField header="X-Volume" type="number" default="0.5">
+  **Legacy mode only:** Volume override (0.0–1.0). Ignored in category mode (uses config volume).
+</ParamField>
+
+### Category Mode (Recommended)
+
+The relay reads `config.json` to get the active pack, loads the pack's `openpeon.json`, and picks a random sound from the specified category while avoiding repeats.
+
+**Example Request:**
+
+```bash
+curl http://localhost:19998/play?category=task.complete
+```
+
+**Response:**
+
+**Status:** `200 OK`
+
+**Content-Type:** `text/plain`
+
+**Body:**
+
+```
+OK: PeonYes1.wav
+```
+
+**Behavior:**
+
+- Reads `~/.claude/hooks/peon-ping/config.json` → `default_pack: "peon"`
+- Loads `~/.claude/hooks/peon-ping/packs/peon/openpeon.json`
+- Finds `categories.task.complete.sounds[]`
+- Picks random sound (avoids last-played)
+- Updates `.state.json` to track last-played
+- Plays audio via native backend
+
+**Errors:**
+
+| Status | Body | Cause |
+|---|---|---|
+| `404 Not Found` | `No sounds for category: <name>` | Category not in active pack or has no sounds |
+
+---
+
+### Legacy Mode (File Path)
+
+Directly play a specific file (no pack/category logic).
+
+**Example Request:**
+
+```bash
+curl -H "X-Volume: 0.7" \
+  http://localhost:19998/play?file=packs/peon/sounds/PeonReady1.wav
+```
+
+**Response:**
+
+**Status:** `200 OK`
+
+**Content-Type:** `text/plain`
+
+**Body:**
+
+```
+OK
+```
+
+**Path Restrictions:**
+
+- All paths are resolved relative to `PEON_DIR` (e.g., `~/.claude/hooks/peon-ping/`)
+- Path traversal (`..`) is **forbidden**
+- Only files **inside `PEON_DIR`** are allowed (security: prevents arbitrary file playback)
+- Only audio files are allowed (`.wav`, `.mp3`, `.ogg`, `.flac`, `.aac`, `.m4a`, `.opus`)
+
+**Errors:**
+
+| Status | Body | Cause |
+|---|---|---|
+| `400 Bad Request` | `Missing file or category parameter` | Neither `file` nor `category` provided |
+| `403 Forbidden` | `Forbidden` | Path traversal detected or file outside `PEON_DIR` |
+| `403 Forbidden` | `Forbidden: not an audio file` | File has non-audio extension |
+| `404 Not Found` | `File not found` | File doesn't exist |
+
+---
+
+## POST /notify
+
+Send a desktop notification.
+
+### Request Body
+
+<ParamField body="title" type="string" default="peon-ping">
+  Notification title (max 256 chars)
+</ParamField>
+
+<ParamField body="message" type="string" required>
+  Notification message (max 512 chars)
+</ParamField>
+
+<ParamField body="color" type="string" default="red">
+  Notification color hint: `red` (error), `blue` (info), or `yellow` (warning)
+</ParamField>
+
+### Example Request
+
+```bash
+curl -X POST http://localhost:19998/notify \
+  -H "Content-Type: application/json" \
+  -d '{
+    "title": "Build Complete",
+    "message": "Tests passed (42 passed, 0 failed)",
+    "color": "blue"
+  }'
+```
+
+### Response
+
+**Status:** `200 OK`
+
+**Content-Type:** `text/plain`
+
+**Body:**
+
+```
+OK
+```
+
+### Notification Behavior
+
+The relay delegates to `scripts/notify.sh`, which reads notification settings from `config.json`:
+
+- **Style:** overlay (large banner) or standard (system notification)
+- **Position:** top-center, top-right, etc.
+- **Dismiss time:** auto-dismiss after N seconds (or persistent)
+- **Icon:** uses pack icon if available
+
+See the [relay overview](/api/relay-overview) for platform-specific notification backends.
+
+### Errors
+
+| Status | Body | Cause |
+|---|---|---|
+| `400 Bad Request` | `Invalid JSON` | Request body is not valid JSON |
+| `404 Not Found` | (empty) | Wrong endpoint (e.g., `GET /notify`) |
+
+---
+
+## Example: Remote Hook Script
+
+Minimal remote hook that uses category-based playback:
+
+```bash
+#!/bin/bash
+# scripts/remote-hook.sh
+
+RELAY_URL="${PEON_RELAY_URL:-http://127.0.0.1:19998}"
+EVENT=$(cat | python3 -c "import sys,json; d=json.load(sys.stdin); print(d.get('hook_event_name',''))" 2>/dev/null)
+
+case "$EVENT" in
+  SessionStart)      CATEGORY="session.start" ;;
+  Stop)              CATEGORY="task.complete" ;;
+  PermissionRequest) CATEGORY="input.required" ;;
+  PostToolUseFailure) CATEGORY="task.error" ;;
+  *)                 exit 0 ;;
+esac
+
+curl -sf "${RELAY_URL}/play?category=${CATEGORY}" >/dev/null 2>&1 &
+```
+
+Register in `~/.claude/settings.json` on the remote server:
+
+```json
+{
+  "hooks": {
+    "SessionStart": [{"command": "bash /path/to/remote-hook.sh"}],
+    "Stop": [{"command": "bash /path/to/remote-hook.sh"}],
+    "PermissionRequest": [{"command": "bash /path/to/remote-hook.sh"}],
+    "PostToolUseFailure": [{"command": "bash /path/to/remote-hook.sh"}]
+  }
+}
+```
+
+## See Also
+
+- [Relay Overview](/api/relay-overview) — setup and auto-detection
+- [Event Categories](/api/event-categories) — CESP category reference
+- [Remote Development](https://github.com/PeonPing/peon-ping#remote-development-ssh--devcontainers--codespaces) — full guide

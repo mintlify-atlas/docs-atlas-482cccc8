@@ -1,0 +1,385 @@
+---
+title: "Pack Management"
+description: "Commands for installing, switching, binding, and removing sound packs"
+---
+
+## packs list
+
+List all installed sound packs.
+
+```bash
+peon packs list
+```
+
+**Output:**
+```
+  peon                     Peon (Warcraft III) *
+  peasant                  Peasant (Warcraft III)
+  glados                   GLaDOS (Portal)
+  sc_kerrigan              Sarah Kerrigan (StarCraft)
+  sc_battlecruiser         Battlecruiser (StarCraft)
+```
+
+The `*` indicates the currently active pack.
+
+### List Registry (All Available Packs)
+
+```bash
+peon packs list --registry
+```
+
+**Output:**
+```
+Available packs in registry (165 total):
+  peon                     Peon (Warcraft III)
+  peasant                  Peasant (Warcraft III)
+  glados                   GLaDOS (Portal)
+  murloc                   Murloc (Warcraft III)
+  duke_nukem               Duke Nukem
+  ...
+```
+
+**Behavior:**
+- Fetches `index.json` from the [OpenPeon registry](https://github.com/PeonPing/registry)
+- Shows all packs, not just installed ones
+- Falls back to local cache if registry is unreachable
+
+## packs install
+
+Install one or more packs from the registry.
+
+### Install Specific Packs
+
+```bash
+peon packs install glados,murloc,duke_nukem
+```
+
+**Output:**
+```
+Downloading glados...
+Extracting glados...
+Downloading murloc...
+Extracting murloc...
+Downloading duke_nukem...
+Extracting duke_nukem...
+Installed 3 packs
+```
+
+**Behavior:**
+- Downloads tarball from `og-packs` releases
+- Extracts to `~/.claude/hooks/peon-ping/packs/<name>/`
+- Validates `openpeon.json` manifest
+- Skips packs that are already installed (use `--force` to re-download)
+
+### Install All Packs
+
+```bash
+peon packs install --all
+```
+
+**Output:**
+```
+Downloading 165 packs from registry...
+...
+Installed 165 packs (12.3 GB)
+```
+
+**Warning:** Installing all packs downloads ~12 GB of audio files.
+
+### Install from Local Directory
+
+```bash
+peon packs install-local /path/to/custom-pack
+```
+
+**Requirements:**
+- Directory must contain `openpeon.json` manifest
+- Sounds must be in `sounds/` subdirectory
+- Follows [CESP v1.0 spec](https://openpeon.com/spec)
+
+## packs use
+
+Switch to a specific pack.
+
+```bash
+peon packs use glados
+```
+
+**Output:**
+```
+peon-ping: switched to glados (GLaDOS)
+```
+
+**Behavior:**
+- Updates `default_pack` in `config.json`
+- Takes effect on next session start
+- Removes legacy `active_pack` key if present
+
+**Error Handling:**
+
+```bash
+peon packs use nonexistent
+# Output: Error: pack "nonexistent" not found.
+#         Available packs: peon, peasant, glados, sc_kerrigan
+```
+
+### Install and Use in One Step
+
+```bash
+peon packs use --install glados
+```
+
+**Behavior:**
+- Downloads `glados` from registry if not installed
+- Switches to `glados` after download completes
+- Useful for trying new packs without separate install step
+
+## packs next
+
+Cycle to the next installed pack.
+
+```bash
+peon packs next
+```
+
+**Output:**
+```
+peon-ping: switched to peasant (Peasant)
+```
+
+**Behavior:**
+- Alphabetically orders installed packs
+- Wraps around to first pack after reaching the last
+- Ignores `pack_rotation` setting (cycles through ALL installed packs)
+
+**Example Flow:**
+
+If installed packs are `glados`, `peon`, `peasant` (sorted alphabetically):
+1. Current: `glados` → Next: `peasant`
+2. Current: `peasant` → Next: `peon`
+3. Current: `peon` → Next: `glados` (wraps around)
+
+## packs bind
+
+Bind a pack to the current directory or a path pattern.
+
+### Bind to Current Directory
+
+```bash
+cd ~/work/client-a
+peon packs bind glados
+```
+
+**Output:**
+```
+peon-ping: bound glados to /Users/you/work/client-a
+```
+
+**Behavior:**
+- Adds a `path_rules` entry to `config.json`:
+  ```json
+  {
+    "path_rules": [
+      { "pattern": "/Users/you/work/client-a", "pack": "glados" }
+    ]
+  }
+  ```
+- Exact path match (not recursive)
+- Pack automatically switches when you start a session in this directory
+
+### Bind to Path Pattern
+
+```bash
+peon packs bind glados --pattern "*/services/*"
+```
+
+**Output:**
+```
+peon-ping: bound glados to pattern */services/*
+```
+
+**Glob Patterns:**
+- `*` — Matches any characters except `/`
+- `*/services` — Any directory ending in `/services`
+- `*/work/client-*` — Any directory matching `/work/client-a`, `/work/client-b`, etc.
+
+**Matching Priority:**
+- First matching rule wins
+- More specific patterns should come first in `path_rules` array
+
+### Install and Bind
+
+```bash
+peon packs bind glados --install
+```
+
+Downloads `glados` from registry if not installed, then binds.
+
+## packs unbind
+
+Remove the binding for the current directory.
+
+```bash
+cd ~/work/client-a
+peon packs unbind
+```
+
+**Output:**
+```
+peon-ping: removed binding for /Users/you/work/client-a
+```
+
+**Behavior:**
+- Removes matching entry from `path_rules`
+- Falls back to `default_pack` for this directory
+
+## packs bindings
+
+List all directory → pack bindings.
+
+```bash
+peon packs bindings
+```
+
+**Output:**
+```
+Path bindings:
+  /Users/you/work/client-a → glados
+  */services/* → sc_kerrigan
+  */personal/* → peon
+```
+
+**No Bindings:**
+```
+No path bindings configured.
+```
+
+## packs remove
+
+Remove one or more installed packs.
+
+```bash
+peon packs remove murloc,duke_nukem
+```
+
+**Output:**
+```
+peon-ping: removed murloc
+peon-ping: removed duke_nukem
+```
+
+**Behavior:**
+- Deletes pack directory from `~/.claude/hooks/peon-ping/packs/`
+- Cannot remove the currently active pack (switch first)
+- Irreversible (re-download with `peon packs install` if needed)
+
+**Error Handling:**
+
+```bash
+peon packs remove peon
+# Output: Error: cannot remove active pack. Switch to another pack first.
+```
+
+## Pack Rotation Modes
+
+Packs can be assigned via three strategies (configured in `config.json`):
+
+### random (default)
+
+Pick a random pack from `pack_rotation` array each session.
+
+```json
+{
+  "pack_rotation_mode": "random",
+  "pack_rotation": ["peon", "glados", "sc_kerrigan"]
+}
+```
+
+### round-robin
+
+Cycle through `pack_rotation` array in order.
+
+```json
+{
+  "pack_rotation_mode": "round-robin",
+  "pack_rotation": ["peon", "glados", "sc_kerrigan"]
+}
+```
+
+Session 1: `peon` → Session 2: `glados` → Session 3: `sc_kerrigan` → Session 4: `peon` (wraps)
+
+### session_override
+
+Manually assign pack per session using `/peon-ping-use <pack>` slash command.
+
+```json
+{
+  "pack_rotation_mode": "session_override"
+}
+```
+
+In Claude Code:
+```
+/peon-ping-use glados
+```
+
+Pack assignment is stored in `.state.json` keyed by session ID.
+
+## Priority Hierarchy
+
+When multiple pack sources exist, PeonPing uses this priority:
+
+1. **Session override** — `/peon-ping-use <pack>` (only when `pack_rotation_mode: session_override`)
+2. **Path rules** — Directory bindings from `peon packs bind`
+3. **Pack rotation** — Random/round-robin from `pack_rotation` array
+4. **Default pack** — Fallback from `default_pack` config key
+
+## Examples
+
+### Install and Switch to New Pack
+
+```bash
+peon packs install glados
+peon packs use glados
+peon preview session.start
+```
+
+### Set Up Per-Project Packs
+
+```bash
+cd ~/work/client-a
+peon packs bind glados --install
+
+cd ~/personal/sideproject
+peon packs bind peon
+```
+
+Now `client-a` sessions use `glados`, `sideproject` sessions use `peon`.
+
+### Rotate Through Multiple Packs
+
+Edit `config.json`:
+```json
+{
+  "pack_rotation_mode": "random",
+  "pack_rotation": ["peon", "glados", "sc_kerrigan", "peasant"]
+}
+```
+
+Each new session picks a random pack from the list.
+
+### Browse and Install from Registry
+
+```bash
+peon packs list --registry | grep -i duke
+# Output: duke_nukem               Duke Nukem
+
+peon packs install duke_nukem
+peon packs use duke_nukem
+```
+
+## Related Commands
+
+- `peon preview <category>` — Test sounds after switching packs
+- `peon status` — Shows active pack and installed pack count
+- `peon rotation <mode>` — Change pack rotation strategy

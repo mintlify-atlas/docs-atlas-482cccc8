@@ -1,0 +1,425 @@
+---
+title: "Notifications"
+description: "Commands for configuring desktop notifications, overlay style, position, templates, and project labels"
+---
+
+## notifications on
+
+Enable desktop notifications.
+
+```bash
+peon notifications on
+```
+
+**Output:**
+```
+peon-ping: desktop notifications on
+```
+
+**Behavior:**
+- Sets `desktop_notifications: true` in `config.json`
+- Independent from sound playback (controlled by `peon pause`)
+- Mobile notifications unaffected
+
+## notifications off
+
+Disable desktop notifications.
+
+```bash
+peon notifications off
+```
+
+**Output:**
+```
+peon-ping: desktop notifications off
+```
+
+**Use Case:**
+- Want voice feedback but no visual distractions
+- Sounds continue playing
+- Mobile notifications continue (if configured)
+
+**Alias:**
+```bash
+peon popups off  # Same as 'notifications off'
+```
+
+## notifications overlay
+
+Use large overlay banners (default).
+
+```bash
+peon notifications overlay
+```
+
+**Output:**
+```
+peon-ping: notification style set to overlay
+```
+
+**Overlay Characteristics:**
+- Large, prominent banners
+- Visible on all screens/monitors
+- **macOS:** JXA Cocoa overlay with custom themes
+- **WSL/MSYS2:** Windows Forms popup
+- Clicking focuses your terminal (Ghostty, iTerm2, Warp, Zed, Terminal.app)
+- iTerm2: clicks focus the correct tab/pane/window
+
+**Available Themes** (macOS only, configured in `config.json`):
+
+| Theme | Style |
+|-------|-------|
+| (default) | Standard banner with project name and message |
+| `jarvis` | Circular HUD with rotating arcs and progress ring |
+| `glass` | Glassmorphism panel with accent bar and timestamp |
+| `sakura` | Zen garden with bonsai tree and cherry blossom petals |
+
+Set in `config.json`:
+```json
+{
+  "overlay_theme": "jarvis"
+}
+```
+
+## notifications standard
+
+Use standard system notifications.
+
+```bash
+peon notifications standard
+```
+
+**Output:**
+```
+peon-ping: notification style set to standard
+```
+
+**Standard Characteristics:**
+- **macOS:** `terminal-notifier` or `osascript`
+- **WSL/MSYS2:** Windows toast notifications
+- **Linux:** `notify-send`
+- Smaller, less intrusive
+- Click-to-focus (when `terminal-notifier` installed on macOS)
+
+**Install terminal-notifier for best results:**
+```bash
+brew install terminal-notifier
+```
+
+## notifications position
+
+Get or set notification position on screen.
+
+### Get Current Position
+
+```bash
+peon notifications position
+```
+
+**Output:**
+```
+peon-ping: notification position top-center
+```
+
+### Set Position
+
+```bash
+peon notifications position bottom-right
+```
+
+**Output:**
+```
+peon-ping: notification position set to bottom-right
+```
+
+**Valid Positions:**
+- `top-left`
+- `top-center` (default)
+- `top-right`
+- `bottom-left`
+- `bottom-center`
+- `bottom-right`
+
+**Applies To:**
+- Overlay notifications (macOS, WSL, MSYS2)
+- Does not affect standard system notifications
+
+## notifications dismiss
+
+Get or set auto-dismiss time in seconds.
+
+### Get Current Dismiss Time
+
+```bash
+peon notifications dismiss
+```
+
+**Output:**
+```
+peon-ping: dismiss time 4s
+```
+
+**Output (when persistent):**
+```
+peon-ping: dismiss time persistent (click to dismiss)
+```
+
+### Set Dismiss Time
+
+```bash
+peon notifications dismiss 10
+```
+
+**Output:**
+```
+peon-ping: dismiss time set to 10s
+```
+
+**Special Value:**
+
+```bash
+peon notifications dismiss 0
+```
+
+**Output:**
+```
+peon-ping: notifications set to persistent (click to dismiss)
+```
+
+**Behavior:**
+- `0` = notifications stay until clicked
+- `> 0` = auto-dismiss after N seconds
+- Default: `4` seconds
+
+## notifications label
+
+Get, set, or reset the project label override for notifications.
+
+### Get Current Label
+
+```bash
+peon notifications label
+```
+
+**Output (with override):**
+```
+peon-ping: label override: My Project
+```
+
+**Output (no override):**
+```
+peon-ping: no label override set
+```
+
+### Set Label Override
+
+```bash
+peon notifications label "Client Work"
+```
+
+**Output:**
+```
+peon-ping: label override set to "Client Work"
+```
+
+**Behavior:**
+- Overrides auto-detected project name in notification titles
+- Max length: 50 characters
+- Takes precedence over `.peon-label` file and git repo name
+
+### Reset to Auto-Detection
+
+```bash
+peon notifications label reset
+```
+
+**Output:**
+```
+peon-ping: label override cleared
+```
+
+**Auto-Detection Priority:**
+1. `notification_title_override` (set via this command)
+2. `.peon-label` file in project root
+3. `project_name_map` pattern match in `config.json`
+4. Git repository name
+5. Directory name
+
+## notifications template
+
+Get, set, or reset message format templates for events.
+
+### List All Templates
+
+```bash
+peon notifications template
+```
+
+**Output (with templates configured):**
+```
+peon-ping: template stop = "{project}: {summary}"
+peon-ping: template permission = "{project}: {tool_name} needs approval"
+peon-ping: template error = "{project}: ❌ {summary}"
+```
+
+**Output (no templates):**
+```
+peon-ping: no notification templates configured (using defaults)
+```
+
+### Get Single Template
+
+```bash
+peon notifications template stop
+```
+
+**Output:**
+```
+peon-ping: template stop = "{project}: {summary}"
+```
+
+**Output (not set):**
+```
+peon-ping: template stop not set (default: "{project}")
+```
+
+### Set Template
+
+```bash
+peon notifications template stop "{project}: ✓ {summary}"
+```
+
+**Output:**
+```
+peon-ping: template stop set to "{project}: ✓ {summary}"
+```
+
+**Available Template Keys:**
+
+| Key | Event | Default |
+|-----|-------|----------|
+| `stop` | Task completes | `{project}` |
+| `permission` | Permission required | `{project}` |
+| `error` | Tool/command error | `{project}` |
+| `idle` | Session idle | `{project}` |
+| `question` | Agent asks question | `{project}` |
+
+**Available Variables:**
+
+| Variable | Description | Example |
+|----------|-------------|----------|
+| `{project}` | Project name (auto-detected or overridden) | `my-app` |
+| `{summary}` | Event summary (from hook JSON) | `Task completed` |
+| `{tool_name}` | Tool name (for permission events) | `Bash` |
+| `{status}` | Event status | `success` |
+| `{event}` | Raw event name | `Stop` |
+
+### Reset All Templates
+
+```bash
+peon notifications template --reset
+```
+
+**Output:**
+```
+peon-ping: notification templates cleared
+```
+
+## notifications test
+
+Send a test notification.
+
+```bash
+peon notifications test
+```
+
+**Output:**
+```
+peon-ping: sending test notification (style: overlay)
+```
+
+**Behavior:**
+- Sends notification with title `peon-ping` and message `This is a test notification`
+- Uses current `notification_style` (overlay or standard)
+- Respects `notification_position` and `notification_dismiss_seconds`
+- Fails if `desktop_notifications: false`
+
+**Error Handling:**
+
+```bash
+peon notifications off
+peon notifications test
+# Output: peon-ping: desktop notifications are off (run 'peon notifications on' to enable)
+```
+
+## Independent Controls
+
+PeonPing has three independent switches:
+
+| Control | Config Key | Affects |
+|---------|------------|----------|
+| `peon pause` / `peon resume` | `enabled` | Sounds only |
+| `peon notifications on/off` | `desktop_notifications` | Desktop popups only |
+| `peon mobile on/off` | `mobile_notify.enabled` | Phone push only |
+
+**Mix and Match:**
+
+```bash
+# Sounds only (no popups)
+peon notifications off
+
+# Popups only (no sounds)
+peon pause
+
+# Phone push only (no sounds or desktop popups)
+peon pause
+peon notifications off
+peon mobile on
+```
+
+## Examples
+
+### Minimal Distractions
+
+```bash
+peon notifications standard
+peon notifications position bottom-right
+peon notifications dismiss 2
+```
+
+Small notifications in bottom-right corner, auto-dismiss after 2 seconds.
+
+### Persistent Reminders
+
+```bash
+peon notifications overlay
+peon notifications position top-center
+peon notifications dismiss 0
+```
+
+Large banners at top of screen, stay until clicked.
+
+### Custom Project Label
+
+```bash
+cd ~/work/secret-project
+peon notifications label "Stealth Mode"
+```
+
+All notifications from this directory show "Stealth Mode" instead of `secret-project`.
+
+### Custom Notification Format
+
+```bash
+peon notifications template stop "✅ {project}: {summary}"
+peon notifications template error "❌ {project}: {summary}"
+peon notifications template permission "⚠️ {project}: {tool_name} needs approval"
+```
+
+Adds emoji prefixes to notification messages.
+
+## Related Commands
+
+- `peon status` — Shows notification style, position, and dismiss time
+- `peon pause` / `peon resume` — Control sounds independently
+- `peon mobile on/off` — Control phone push independently

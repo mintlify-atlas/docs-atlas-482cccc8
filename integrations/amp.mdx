@@ -1,0 +1,121 @@
+---
+title: 'Amp'
+description: 'Filesystem watcher adapter for Amp (ampcode.com)'
+---
+
+Amp doesn't expose event hooks like Claude Code, so PeonPing watches Amp's thread files on disk and detects when the agent finishes a turn.
+
+## Setup
+
+<Steps>
+  <Step title="Install PeonPing">
+    ```bash
+    curl -fsSL https://raw.githubusercontent.com/PeonPing/peon-ping/main/install.sh | bash
+    ```
+  </Step>
+
+  <Step title="Install filesystem watcher">
+    **macOS:**
+    ```bash
+    brew install fswatch
+    ```
+
+    **Linux:**
+    ```bash
+    sudo apt install inotify-tools
+    ```
+  </Step>
+
+  <Step title="Start the adapter">
+    **Foreground:**
+    ```bash
+    bash ~/.claude/hooks/peon-ping/adapters/amp.sh
+    ```
+
+    **Background (recommended):**
+    ```bash
+    bash ~/.claude/hooks/peon-ping/adapters/amp.sh &
+    ```
+
+    Add to your shell rc file (`.zshrc`, `.bashrc`) to auto-start on login.
+  </Step>
+</Steps>
+
+## How It Works
+
+Amp stores conversation threads as JSON files in `~/.local/share/amp/threads/`. The adapter:
+
+1. Watches `~/.local/share/amp/threads/` for file changes
+2. Detects new thread files → emits `session.start`
+3. Detects when a thread stops updating (1s idle) → emits `task.complete` if the last message is from the assistant with text content
+
+### Thread State Detection
+
+The adapter parses each thread JSON and checks the last message:
+
+```python
+last_message = thread['messages'][-1]
+if last_message['role'] == 'assistant':
+    content_types = [c['type'] for c in last_message['content']]
+    if 'tool_use' in content_types:
+        # Agent is still working (tool results pending)
+        pass
+    elif 'text' in content_types:
+        # Agent finished and is waiting for input
+        emit_event('Stop')
+```
+
+## Event Mapping
+
+| Amp Event | CESP Category | Trigger |
+|-----------|---------------|--------|
+| New thread file created | `session.start` | `T-*.json` appears in threads dir |
+| Thread idle + assistant text | `task.complete` | Thread stops updating, last message is assistant with text content |
+
+## Configuration
+
+Environment variables:
+
+| Variable | Default | Description |
+|----------|---------|-------------|
+| `AMP_DATA_DIR` | `~/.local/share/amp` | Amp data directory |
+| `AMP_THREADS_DIR` | `$AMP_DATA_DIR/threads` | Threads directory to watch |
+| `AMP_IDLE_SECONDS` | `1` | Seconds of no changes before emitting Stop |
+| `AMP_STOP_COOLDOWN` | `10` | Minimum seconds between Stop events per thread |
+
+Example:
+
+```bash
+AMP_IDLE_SECONDS=2 bash ~/.claude/hooks/peon-ping/adapters/amp.sh
+```
+
+## Stopping the Adapter
+
+If running in the background, find the process and kill it:
+
+```bash
+ps aux | grep amp.sh
+kill <PID>
+```
+
+Or use `pkill`:
+
+```bash
+pkill -f 'amp.sh'
+```
+
+## Limitations
+
+- **No permission prompt detection** — Amp doesn't expose tool approval events, so `input.required` sounds won't play
+- **No error detection** — Tool failures aren't visible in thread files
+- **Idle timer accuracy** — Very short tasks (under 1 second) might not trigger a sound
+
+## Windows Support
+
+Use the PowerShell adapter (`amp.ps1`) on native Windows:
+
+```powershell
+powershell -File "$env:USERPROFILE\.claude\hooks\peon-ping\adapters\amp.ps1"
+```
+
+The PowerShell version uses .NET `FileSystemWatcher` instead of fswatch.

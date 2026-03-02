@@ -1,0 +1,217 @@
+---
+title: MCP Resources
+description: Catalog and pack resources for sound discovery
+---
+
+# MCP Resources
+
+The PeonPing MCP server exposes two resources for discovering available sounds.
+
+## peon-ping://catalog
+
+Full catalog of all installed sound packs and their sounds.
+
+### URI
+
+```
+peon-ping://catalog
+```
+
+### Description
+
+> All sound packs and their sounds
+
+### MIME Type
+
+```
+text/plain
+```
+
+### Response Format
+
+<ResponseField name="contents" type="array">
+  Array with a single content object
+  
+  <ResponseField name="uri" type="string">
+    Always `"peon-ping://catalog"`
+  </ResponseField>
+  
+  <ResponseField name="text" type="string">
+    Formatted catalog listing
+  </ResponseField>
+</ResponseField>
+
+### Example Response
+
+```json
+{
+  "contents": [
+    {
+      "uri": "peon-ping://catalog",
+      "text": "165 packs. Use play_sound with \"pack/SoundName\".\n\nduke_nukem (Duke Nukem 3D): duke_nukem/DamnImGood (\"Damn, I'm good.\"), duke_nukem/SonOfABitch (\"Son of a bitch!\"), duke_nukem/Groovy (\"Groovy.\")\nglados (GLaDOS (Portal)): glados/OhItsYou (\"Oh, it's you.\"), glados/WellDone (\"Well done.\"), glados/YouMonster (\"You monster.\")\npeon (Orc Peon (Warcraft III)): peon/PeonReady1 (\"Ready to work?\"), peon/PeonWhat1 (\"Yes?\"), peon/PeonYes1 (\"Work, work.\"), peon/PeonYes4 (\"Okie dokie.\")\nsc_kerrigan (Sarah Kerrigan (StarCraft)): sc_kerrigan/IReadYou (\"I read you.\"), sc_kerrigan/WhatNow (\"What now?\"), sc_kerrigan/EasilyAmused (\"Easily amused, huh?\")"
+    }
+  ]
+}
+```
+
+### Format Details
+
+The catalog text follows this structure:
+
+```
+<pack_count> packs. Use play_sound with "pack/SoundName".
+
+<pack_name> (<display_name>): <key1> ("<label1>"), <key2> ("<label2>"), ...
+<pack_name> (<display_name>): <key1> ("<label1>"), <key2> ("<label2>"), ...
+```
+
+Packs are sorted alphabetically by name.
+
+### No Packs Installed
+
+If no packs are found:
+
+```json
+{
+  "contents": [
+    {
+      "uri": "peon-ping://catalog",
+      "text": "No packs installed."
+    }
+  ]
+}
+```
+
+---
+
+## peon-ping://pack/{name}
+
+Sounds in a specific pack.
+
+### URI Template
+
+```
+peon-ping://pack/{name}
+```
+
+**Parameters:**
+
+- `{name}` — pack directory name (e.g., `peon`, `glados`)
+
+### Description
+
+> Sounds in a specific pack
+
+### MIME Type
+
+```
+text/plain
+```
+
+### Response Format
+
+<ResponseField name="contents" type="array">
+  Array with a single content object
+  
+  <ResponseField name="uri" type="string">
+    The requested URI (e.g., `"peon-ping://pack/peon"`)
+  </ResponseField>
+  
+  <ResponseField name="text" type="string">
+    Formatted pack details (display name + sounds grouped by category)
+  </ResponseField>
+</ResponseField>
+
+### Example Request
+
+```
+peon-ping://pack/peon
+```
+
+### Example Response
+
+```json
+{
+  "contents": [
+    {
+      "uri": "peon-ping://pack/peon",
+      "text": "Orc Peon (Warcraft III):\n\nsession.start:\n  peon/PeonReady1 — \"Ready to work?\"\n  peon/PeonWhat1 — \"Yes?\"\n\ntask.complete:\n  peon/PeonYes1 — \"Work, work.\"\n  peon/PeonYes4 — \"Okie dokie.\"\n\ninput.required:\n  peon/PeonWhat2 — \"What you want?\"\n  peon/PeonWhat3 — \"Hmm?\"\n\nuser.spam:\n  peon/PeonPissed3 — \"Me busy, leave me alone!\""
+    }
+  ]
+}
+```
+
+### Format Details
+
+The pack text follows this structure:
+
+```
+<display_name>:
+
+<category1>:
+  <pack>/<sound1> — "<label1>"
+  <pack>/<sound2> — "<label2>"
+
+<category2>:
+  <pack>/<sound3> — "<label3>"
+```
+
+Categories are listed in the order they appear in `openpeon.json`.
+
+### Pack Not Found
+
+If the pack doesn't exist:
+
+```json
+{
+  "contents": [
+    {
+      "uri": "peon-ping://pack/nonexistent",
+      "text": "Pack \"nonexistent\" not found."
+    }
+  ]
+}
+```
+
+## Usage Pattern
+
+Typical agent workflow:
+
+1. **Session start** — read `peon-ping://catalog` once
+2. **Store catalog** — parse available packs and sounds
+3. **On events** — call `play_sound` with appropriate key
+4. **Optional** — read `peon-ping://pack/{name}` for detailed pack info
+
+Example:
+
+```typescript
+// Agent initializes
+resource_read("peon-ping://catalog")
+// → stores: { peon: [...], glados: [...], duke_nukem: [...] }
+
+// Build fails
+tool_use("bash", "npm test") → exit_code=1
+tool_use("play_sound", { sound: "duke_nukem/SonOfABitch" })
+
+// Permission needed
+tool_use("play_sound", { sound: "glados/AreYouStillThere" })
+
+// Task complete
+tool_use("play_sound", { sound: "peon/PeonYes1" })
+```
+
+## Pack Discovery
+
+The MCP server searches for packs in:
+
+1. `$PEON_PACKS_DIR` (if set)
+2. `~/.openpeon/packs/`
+3. `~/.claude/hooks/peon-ping/packs/`
+
+Only directories with a valid `openpeon.json` or `manifest.json` file are included in the catalog.
+
+## See Also
+
+- [MCP Tools](/api/mcp-tools) — `play_sound` parameters
+- [Pack Manifest](/api/pack-manifest) — `openpeon.json` structure
+- [Event Categories](/api/event-categories) — CESP category reference

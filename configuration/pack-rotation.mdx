@@ -1,0 +1,288 @@
+---
+title: Pack Rotation
+description: Configure how PeonPing selects sound packs including rotation modes, path-based rules, and per-session overrides.
+---
+
+PeonPing supports multiple sound pack selection strategies, from simple fixed packs to advanced rotation modes and directory-based rules.
+
+## Default Pack
+
+<ParamField path="default_pack" type="string" default="peon">
+  The fallback pack used when no more specific rule applies.
+  
+  This replaces the legacy `active_pack` key. Existing configs are migrated automatically.
+</ParamField>
+
+**CLI commands:**
+
+```bash
+peon packs use glados              # Switch to a specific pack
+peon packs use --install glados    # Install and switch in one step
+peon packs list                    # List installed packs
+```
+
+**Example:**
+
+```json
+{
+  "default_pack": "glados"
+}
+```
+
+## Pack Rotation Array
+
+<ParamField path="pack_rotation" type="array" default="[]">
+  Array of pack names to rotate through.
+  
+  Used when `pack_rotation_mode` is `"random"` or `"round-robin"`.
+  
+  Leave empty `[]` to use `default_pack` (or `path_rules`) only.
+</ParamField>
+
+**Example:**
+
+```json
+{
+  "pack_rotation": ["peon", "sc_kerrigan", "peasant", "glados"]
+}
+```
+
+<Note>
+Pack names in `pack_rotation` must match installed pack directories in `~/.claude/hooks/peon-ping/packs/`.
+</Note>
+
+## Pack Rotation Mode
+
+<ParamField path="pack_rotation_mode" type="string" default="random">
+  Controls how PeonPing selects a pack for each session.
+  
+  **Options:**
+  - `"random"` — Pick a random pack from `pack_rotation` each session (default)
+  - `"round-robin"` — Cycle through `pack_rotation` in order each session
+  - `"session_override"` — Use `/peon-ping-use <pack>` to assign a pack per session
+  
+  `"agentskill"` is accepted as a legacy alias for `"session_override"`.
+</ParamField>
+
+**CLI commands:**
+
+```bash
+peon rotation                      # Show current mode
+peon rotation random               # Set to random
+peon rotation round-robin          # Set to round-robin
+peon rotation session_override     # Set to session override
+```
+
+**Example:**
+
+```json
+{
+  "pack_rotation_mode": "round-robin",
+  "pack_rotation": ["peon", "sc_kerrigan", "peasant"]
+}
+```
+
+### Mode Details
+
+#### Random Mode
+
+Each new session picks a random pack from `pack_rotation`. The same pack may be selected multiple times in a row (true randomness).
+
+```json
+{
+  "pack_rotation_mode": "random",
+  "pack_rotation": ["peon", "glados", "sc_kerrigan"]
+}
+```
+
+#### Round-Robin Mode
+
+Cycles through `pack_rotation` in order. State is persisted in `.state.json` so the rotation index survives restarts.
+
+```json
+{
+  "pack_rotation_mode": "round-robin",
+  "pack_rotation": ["peon", "glados", "sc_kerrigan"]
+}
+```
+
+**Sequence:**
+1. Session 1 → `peon`
+2. Session 2 → `glados`
+3. Session 3 → `sc_kerrigan`
+4. Session 4 → `peon` (loops back)
+
+#### Session Override Mode
+
+Use the `/peon-ping-use <pack>` slash command in Claude Code to assign a specific pack to the current agent session.
+
+Each session can have its own pack, and assignments persist until the session ends.
+
+```json
+{
+  "pack_rotation_mode": "session_override"
+}
+```
+
+**Usage in Claude Code:**
+
+```
+/peon-ping-use glados
+```
+
+The current session will now use the `glados` pack until you end the session or assign a different pack.
+
+<Tip>
+Session assignments are stored in `.state.json` with automatic expiration based on `session_ttl_days`.
+</Tip>
+
+## Path Rules
+
+<ParamField path="path_rules" type="array" default="[]">
+  Array of `{ "pattern": "...", "pack": "..." }` objects.
+  
+  Assigns a pack to sessions based on the working directory using glob matching (`*`, `?`).
+  
+  **Rules:**
+  - First matching rule wins
+  - Beats `pack_rotation` and `default_pack`
+  - Overridden by `session_override` assignments
+</ParamField>
+
+**Example:**
+
+```json
+{
+  "path_rules": [
+    { "pattern": "*/work/client-a/*", "pack": "glados" },
+    { "pattern": "*/work/client-b/*", "pack": "sc_kerrigan" },
+    { "pattern": "*/personal/*", "pack": "peon" },
+    { "pattern": "*/gaming/*", "pack": "sc_battlecruiser" }
+  ]
+}
+```
+
+**CLI commands:**
+
+```bash
+peon packs bind glados                       # Bind pack to current directory
+peon packs bind --pattern "*/services" glados  # Bind pack to a pattern
+peon packs unbind                            # Remove current directory
+peon packs bindings                          # List all path rules
+```
+
+### Pattern Syntax
+
+Path rules use glob patterns:
+
+- `*` — Match any characters (except `/`)
+- `?` — Match a single character
+- `*/work/client-a/*` — Match any path containing `/work/client-a/`
+- `/home/user/project` — Exact path match
+
+**Examples:**
+
+| Pattern | Matches | Doesn't Match |
+|---------|---------|---------------|
+| `*/work/*` | `/home/user/work/project` | `/home/user/personal/project` |
+| `/home/user/client-a` | `/home/user/client-a` | `/home/user/client-a/subdir` |
+| `*/services` | `/home/user/work/services` | `/home/user/work/services/api` |
+
+<Warning>
+Pattern matching is **case-sensitive** on Linux/macOS and **case-insensitive** on Windows/WSL2.
+</Warning>
+
+## Pack Selection Priority
+
+When a new session starts, PeonPing selects a pack in this order:
+
+1. **Session override** (if `pack_rotation_mode` is `session_override` and a pack was assigned with `/peon-ping-use`)
+2. **Path rules** (first matching rule from `path_rules`)
+3. **Pack rotation** (if `pack_rotation` is not empty and mode is `random` or `round-robin`)
+4. **Default pack** (fallback)
+
+**Example config combining all strategies:**
+
+```json
+{
+  "default_pack": "peon",
+  "pack_rotation": ["glados", "sc_kerrigan", "peasant"],
+  "pack_rotation_mode": "random",
+  "path_rules": [
+    { "pattern": "*/work/*", "pack": "sc_battlecruiser" }
+  ]
+}
+```
+
+**Result:**
+- Sessions in `/home/user/work/...` → `sc_battlecruiser` (path rule)
+- All other sessions → random pick from `["glados", "sc_kerrigan", "peasant"]`
+- If rotation is empty → `peon` (default)
+
+## Session TTL
+
+<ParamField path="session_ttl_days" type="number" default="7">
+  Expire stale per-session pack assignments older than N days.
+  
+  Prevents `.state.json` from growing unbounded when using `session_override` mode.
+  
+  Sessions that haven't been active for `session_ttl_days` are automatically removed from state.
+</ParamField>
+
+**Example:**
+
+```json
+{
+  "session_ttl_days": 14
+}
+```
+
+## Installing Packs
+
+Before using a pack in rotation or path rules, install it:
+
+```bash
+peon packs install glados,sc_kerrigan     # Install specific packs
+peon packs install --all                  # Install all registry packs
+peon packs list --registry                # Browse available packs
+```
+
+Packs are downloaded from the [OpenPeon registry](https://github.com/PeonPing/registry) and stored in `~/.claude/hooks/peon-ping/packs/`.
+
+## Browsing Packs
+
+View installed packs:
+
+```bash
+peon packs list
+```
+
+**Example output:**
+
+```
+  glados                   GLaDOS (Portal) *
+  peon                     Orc Peon (Warcraft III)
+  sc_kerrigan              Sarah Kerrigan (StarCraft)
+```
+
+The `*` indicates the current `default_pack`.
+
+Browse all available packs in the registry:
+
+```bash
+peon packs list --registry
+```
+
+Or visit [openpeon.com/packs](https://openpeon.com/packs) for audio previews.
+
+## Removing Packs
+
+Remove installed packs:
+
+```bash
+peon packs remove glados,sc_kerrigan
+```
+
+<Warning>
+Removing a pack that's referenced in `default_pack`, `pack_rotation`, or `path_rules` will cause PeonPing to fall back to the next available rule.
+</Warning>

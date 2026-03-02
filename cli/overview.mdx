@@ -1,0 +1,120 @@
+---
+title: "CLI Overview"
+description: "Introduction to the peon-ping command-line interface, tab completion, and command structure"
+---
+
+## Introduction
+
+The `peon` command-line interface provides complete control over PeonPing sounds, notifications, sound packs, and settings. All commands work across macOS, Linux, WSL2, and Windows.
+
+## Command Structure
+
+```bash
+peon <command> [subcommand] [arguments] [flags]
+```
+
+Example:
+```bash
+peon packs use glados --install
+```
+
+## Global Behavior
+
+### Configuration Location
+
+Commands read and write to different config locations depending on install mode:
+
+- **Global install**: `~/.claude/hooks/peon-ping/config.json`
+- **Local install**: `./.claude/hooks/peon-ping/config.json` (project-specific)
+
+Local config takes precedence when both exist.
+
+### State Persistence
+
+All CLI changes persist immediately:
+- Volume changes apply to the next sound
+- Pack switching takes effect on the next session
+- Pause/resume state persists across terminal sessions
+
+## Tab Completion
+
+PeonPing supports intelligent tab completion for bash and fish shells.
+
+### Enable Completion
+
+Completion is automatically installed by `install.sh` / `install.ps1`. If you need to enable it manually:
+
+**Bash:**
+```bash
+source ~/.claude/hooks/peon-ping/completions.bash
+```
+
+**Fish:**
+```bash
+source ~/.claude/hooks/peon-ping/completions.fish
+```
+
+### What Gets Completed
+
+```bash
+peon <TAB>                    # Lists all commands
+peon packs use <TAB>           # Lists installed pack names
+peon notifications <TAB>       # Lists notification subcommands
+peon trainer <TAB>             # Lists trainer subcommands
+```
+
+## Command Categories
+
+Commands are organized into logical groups:
+
+| Category | Commands | Purpose |
+|----------|----------|----------|
+| **Sound Control** | `toggle`, `pause`, `resume`, `volume`, `preview` | Mute, adjust volume, test sounds |
+| **Pack Management** | `packs list/install/use/next/bind/remove` | Download, switch, and assign packs |
+| **Notifications** | `notifications on/off/overlay/standard/position/template` | Configure desktop popups |
+| **Trainer** | `trainer on/off/status/log/goal` | Exercise reminder system |
+| **Relay** | `relay --daemon/--stop/--status/--port` | Remote audio server for SSH/containers |
+| **Status** | `status` | Show current configuration and state |
+
+## Exit Codes
+
+All commands follow standard POSIX exit codes:
+
+- `0` — Success
+- `1` — General error (invalid argument, file not found, etc.)
+- `2` — Misuse (wrong number of arguments)
+
+## Environment Variables
+
+Some commands respect environment variables:
+
+| Variable | Purpose | Example |
+|----------|---------|----------|
+| `PEON_RELAY_PORT` | Override relay port | `PEON_RELAY_PORT=12345` |
+| `PEON_RELAY_HOST` | Override relay host | `PEON_RELAY_HOST=192.168.1.100` |
+| `CLAUDE_CONFIG_DIR` | Override config directory | `CLAUDE_CONFIG_DIR=~/.myconfig` |
+
+## Getting Help
+
+Most commands show usage when run without arguments:
+
+```bash
+peon notifications
+# Output: Usage: peon notifications <on|off|overlay|standard|position|template|test>
+
+peon packs
+# Output: Usage: peon packs <list|install|use|next|bind|remove>
+```
+
+For relay-specific help:
+```bash
+peon relay --help
+```
+
+## Next Steps
+
+- [Sound Control Commands](/cli/sound-control) — Toggle, volume, preview
+- [Pack Management](/cli/pack-management) — Install, switch, and bind packs
+- [Notifications](/cli/notifications) — Configure desktop popups
+- [Trainer](/cli/trainer) — Exercise reminders
+- [Relay](/cli/relay) — Remote audio for SSH/containers

@@ -1,0 +1,257 @@
+---
+title: Contributing to PeonPing
+description: How to contribute sound packs, code, and IDE adapters to PeonPing
+---
+
+## Add a new sound pack
+
+Sound packs are now hosted in their own GitHub repos and registered in the [OpenPeon registry](https://github.com/PeonPing/registry).
+
+### 1. Create your pack
+
+Create a new GitHub repo (e.g., `yourname/openpeon-mypack`) with this structure:
+
+```
+openpeon-mypack/
+  openpeon.json
+  sounds/
+    SomeSound.wav
+    AnotherSound.mp3
+    ...
+  README.md
+  LICENSE
+```
+
+Audio formats: WAV, MP3, or OGG. Keep files small (game sound effects are ideal). Max 1 MB per file, 50 MB total.
+
+### 2. Write the manifest
+
+Create an `openpeon.json` mapping your sounds to CESP categories:
+
+```json
+{
+  "cesp_version": "1.0",
+  "name": "my_pack",
+  "display_name": "My Character",
+  "version": "1.0.0",
+  "author": { "name": "Your Name", "github": "yourname" },
+  "license": "CC-BY-NC-4.0",
+  "language": "en",
+  "categories": {
+    "session.start": {
+      "sounds": [
+        { "file": "sounds/Hello.mp3", "label": "Hello there" }
+      ]
+    },
+    "task.acknowledge": {
+      "sounds": [
+        { "file": "sounds/OnIt.mp3", "label": "On it" }
+      ]
+    },
+    "task.complete": {
+      "sounds": [
+        { "file": "sounds/Done.mp3", "label": "Done" }
+      ]
+    },
+    "task.error": {
+      "sounds": [
+        { "file": "sounds/Oops.mp3", "label": "Oops" }
+      ]
+    },
+    "input.required": {
+      "sounds": [
+        { "file": "sounds/NeedHelp.mp3", "label": "Need your help" }
+      ]
+    },
+    "resource.limit": {
+      "sounds": [
+        { "file": "sounds/Blocked.mp3", "label": "Blocked" }
+      ]
+    },
+    "user.spam": {
+      "sounds": [
+        { "file": "sounds/StopIt.mp3", "label": "Stop it" }
+      ]
+    }
+  }
+}
+```
+
+**Categories explained:**
+
+| Category | When it plays |
+|---|---|
+| `session.start` | Session starts (`$ claude`) |
+| `task.acknowledge` | Claude acknowledges a task |
+| `task.complete` | Claude finishes and is idle |
+| `task.error` | Something fails |
+| `input.required` | Claude needs tool approval |
+| `resource.limit` | Resource limits hit |
+| `user.spam` | User spams prompts (3+ in 10 seconds) |
+
+Not every category is required — just include the ones you have sounds for.
+
+### 3. Tag a release
+
+```bash
+git tag v1.0.0
+git push origin v1.0.0
+```
+
+### 4. Register your pack
+
+Submit your pack to the [OpenPeon registry](https://github.com/PeonPing/registry):
+
+1. Fork [PeonPing/registry](https://github.com/PeonPing/registry)
+2. Add your pack entry to `index.json` (keep alphabetical order — see [registry CONTRIBUTING.md](https://github.com/PeonPing/registry/blob/main/CONTRIBUTING.md))
+3. Open a pull request
+
+Once merged, your pack will be installable by everyone and listed on [openpeon.com/packs](https://openpeon.com/packs).
+
+## Automate pack creation
+
+Have a single audio file with all your character's quotes? You can auto-transcribe and split it:
+
+1. Copy `.env.example` to `.env` and add your [Deepgram API key](https://console.deepgram.com) (or use [Whisper](https://github.com/openai/whisper) locally)
+2. Transcribe with word-level timestamps:
+
+```bash
+# Option A: Deepgram (cloud, fast)
+source .env
+curl --http1.1 -X POST \
+  "https://api.deepgram.com/v1/listen?model=nova-2&smart_format=true&utterances=true&utt_split=0.8" \
+  -H "Authorization: Token $DEEPGRAM_API_KEY" \
+  -H "Content-Type: audio/mpeg" \
+  --data-binary @your_audio.mp3 -o transcription.json
+
+# Option B: Whisper (local, free)
+pip install openai-whisper
+whisper your_audio.mp3 --model base --language en --output_format json --word_timestamps True --output_dir .
+```
+
+3. Use the timestamps from the JSON to cut individual clips with ffmpeg:
+
+```bash
+ffmpeg -i your_audio.mp3 -ss 0.0 -to 1.5 -c copy sounds/Quote1.mp3 -y
+ffmpeg -i your_audio.mp3 -ss 2.0 -to 4.8 -c copy sounds/Quote2.mp3 -y
+# ... repeat for each quote
+```
+
+4. Map the clips to categories in `openpeon.json` and you're done.
+
+## Contribute code
+
+Bug fixes, new features, and IDE adapters are welcome as PRs to the [main repo](https://github.com/PeonPing/peon-ping). Sound packs should **not** be added to the main repo — use the registry flow above.
+
+### Development setup
+
+**Clone the repo:**
+
+```bash
+git clone https://github.com/PeonPing/peon-ping.git
+cd peon-ping
+```
+
+**Install locally for testing:**
+
+```bash
+# Unix/WSL
+bash install.sh --local
+
+# Native Windows
+powershell -File install.ps1
+```
+
+**Run tests:**
+
+```bash
+# Install bats (macOS)
+brew install bats-core
+
+# Run all tests
+bats tests/
+
+# Run specific test file
+bats tests/peon.bats
+
+# Run single test by name
+bats tests/peon.bats -f "SessionStart plays a greeting sound"
+```
+
+**Windows tests (Pester):**
+
+```powershell
+Invoke-Pester -Path tests/adapters-windows.Tests.ps1
+```
+
+### Contribution guidelines
+
+- **Tests required:** Add BATS tests for new features or bug fixes
+- **Update docs:** If you change behavior, update `README.md` and `README_zh.md`
+- **Follow conventions:** Shell scripts use 2-space indentation, avoid bashisms when possible
+- **Update CHANGELOG.md:** Add your changes under "Unreleased" at the top
+
+### Adding a new IDE adapter
+
+If you're adding support for a new IDE:
+
+1. Create `adapters/myide.sh` that translates IDE events to CESP JSON format
+2. Create `adapters/myide.ps1` for Windows support
+3. Add tests in `tests/peon.bats`
+4. Update the supported IDEs section in `README.md`
+5. Add detection logic to `install.sh` and `install.ps1` if needed
+
+See existing adapters (`adapters/opencode.sh`, `adapters/windsurf.sh`) for examples.
+
+## Release process
+
+When ready to release a new version:
+
+1. **Run tests:**
+   ```bash
+   bats tests/
+   ```
+
+2. **Update CHANGELOG.md:**
+   - Add new section at top with version, date, and categorized changes (Added/Fixed/Breaking)
+
+3. **Bump VERSION file:**
+   - Patch (1.8.1): bug fixes, small tweaks
+   - Minor (1.9.0): new features, adapters, platform support
+   - Major (2.0.0): breaking changes
+
+4. **Commit and tag:**
+   ```bash
+   git commit -m "chore: bump version to X.Y.Z"
+   git tag vX.Y.Z
+   git push && git push --tags
+   ```
+
+The tag push triggers CI to create a GitHub Release and auto-update the Homebrew tap.
+
+See [RELEASING.md](https://github.com/PeonPing/peon-ping/blob/main/RELEASING.md) for full details.
+
+## Pack ideas
+
+Browse the full catalog at [openpeon.com/packs](https://openpeon.com/packs) for inspiration, or check the [pack creation guide](https://openpeon.com/create) for a complete walkthrough.
+
+Popular pack categories:
+- **Game characters:** Warcraft, StarCraft, Portal, Zelda, Dota 2, Elder Scrolls
+- **Movie/TV quotes:** Duke Nukem, Sopranos, Rick Sanchez
+- **Language variants:** Czech, French, Spanish, Polish versions of classic packs
+- **Original voices:** Custom ElevenLabs or recorded voice lines
+
+## Community
+
+- **GitHub:** [github.com/PeonPing/peon-ping](https://github.com/PeonPing/peon-ping)
+- **X/Twitter:** [@peonping](https://x.com/peonping)
+- **Issues:** Report bugs at [github.com/PeonPing/peon-ping/issues](https://github.com/PeonPing/peon-ping/issues)
+
+## Support the project
+
+PeonPing is open source and free. If you'd like to support development:
+
+- **Venmo:** [@garysheng](https://venmo.com/garysheng)
+- **Community Token (DYOR):** Someone created a $PEON token on Base — we receive TX fees which help fund development. [`0xf4ba744229afb64e2571eef89aacec2f524e8ba3`](https://dexscreener.com/base/0xf4bA744229aFB64E2571eef89AaceC2F524e8bA3)
+
+Thank you for contributing!

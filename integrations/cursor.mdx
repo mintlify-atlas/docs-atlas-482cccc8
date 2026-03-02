@@ -1,0 +1,153 @@
+---
+title: 'Cursor'
+description: 'Built-in adapter for Cursor IDE via hooks.json'
+---
+
+Cursor supports PeonPing through its hook system. The installer auto-detects Cursor and registers hooks in `~/.claude/settings.json`.
+
+## Setup
+
+<Steps>
+  <Step title="Install PeonPing">
+    **macOS / Linux / WSL2:**
+    ```bash
+    curl -fsSL https://raw.githubusercontent.com/PeonPing/peon-ping/main/install.sh | bash
+    ```
+
+    **Windows:**
+    ```powershell
+    Invoke-WebRequest -Uri "https://raw.githubusercontent.com/PeonPing/peon-ping/main/install.ps1" -UseBasicParsing | Invoke-Expression
+    ```
+  </Step>
+
+  <Step title="Enable third-party skills (Windows only)">
+    On Windows, Cursor doesn't load `~/.claude/settings.json` by default. Enable it:
+
+    1. Open Cursor Settings
+    2. Navigate to **Features → Third-party skills**
+    3. Toggle **ON**
+
+    This allows Cursor to load hook registrations from `~/.claude/settings.json` for SessionStart/Stop sounds.
+  </Step>
+
+  <Step title="Restart Cursor">
+    Hooks activate on next launch.
+  </Step>
+</Steps>
+
+## How It Works
+
+The installer registers `cursor.sh` (or `cursor.ps1` on Windows) in `~/.claude/settings.json`:
+
+```json
+{
+  "hooks": {
+    "stop": [
+      {
+        "command": "bash ~/.claude/hooks/peon-ping/adapters/cursor.sh stop"
+      }
+    ],
+    "beforeShellExecution": [
+      {
+        "command": "bash ~/.claude/hooks/peon-ping/adapters/cursor.sh beforeShellExecution"
+      }
+    ]
+  }
+}
+```
+
+Cursor pipes JSON context to stdin:
+
+```json
+{
+  "conversation_id": "abc123",
+  "workspace_roots": ["/Users/dev/project"],
+  "cwd": "/Users/dev/project"
+}
+```
+
+The adapter extracts `conversation_id` and `workspace_roots`, then transforms it into the format `peon.sh` expects:
+
+```json
+{
+  "hook_event_name": "Stop",
+  "notification_type": "",
+  "cwd": "/Users/dev/project",
+  "session_id": "cursor-abc123",
+  "permission_mode": ""
+}
+```
+
+## Event Mapping
+
+| Cursor Event | CESP Category | Trigger |
+|--------------|---------------|---------|
+| `stop` | `task.complete` | Agent finishes turn |
+| `beforeShellExecution` | `task.acknowledge` | Shell command about to execute |
+| `beforeMCPExecution` | `task.acknowledge` | MCP tool about to execute |
+| `afterFileEdit` | `task.complete` | File edit completes |
+
+<Note>
+  `beforeReadFile` is intentionally excluded — it fires on every file read and would be too noisy.
+</Note>
+
+## Cursor-Specific Features
+
+### Conversation-Based Session IDs
+
+Cursor provides a `conversation_id` for each chat session. The adapter uses this to track state across multiple tool calls:
+
+```bash
+SESSION_ID=$(echo "$INPUT" | jq -r '.conversation_id // empty')
+[ -z "$SESSION_ID" ] && SESSION_ID="cursor-$$"
+```
+
+### Workspace Root Detection
+
+Cursor sends `workspace_roots` — the adapter uses the first entry as the working directory:
+
+```bash
+CWD=$(echo "$INPUT" | jq -r '.workspace_roots[0] // .cwd // ""')
+[ -z "$CWD" ] && CWD="${PWD}"
+```
+
+## Configuration
+
+Cursor shares the global PeonPing config:
+
+- Config: `~/.claude/hooks/peon-ping/config.json`
+- Packs: `~/.claude/hooks/peon-ping/packs/`
+
+See [Configuration](/configuration/overview) for all options.
+
+## Limitations
+
+- **No SessionStart event** — Cursor doesn't expose a session start hook, so greeting sounds won't play when you open Cursor
+- **No permission prompt detection** — Tool approval events aren't exposed
+- **beforeShellExecution fires often** — You might want to disable `task.acknowledge` sounds:
+
+  ```json
+  {
+    "categories": {
+      "task.acknowledge": false
+    }
+  }
+  ```
+
+## Windows PowerShell Adapter
+
+On native Windows, the installer copies `cursor.ps1` and registers it:
+
+```json
+{
+  "hooks": {
+    "stop": [
+      {
+        "command": "powershell -File ~/.claude/hooks/peon-ping/adapters/cursor.ps1 stop"
+      }
+    ]
+  }
+}
+```
+
+The PowerShell adapter uses native .NET JSON parsing and pipes to `peon.ps1` for audio playback.

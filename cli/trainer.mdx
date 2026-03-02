@@ -1,0 +1,368 @@
+---
+title: "Trainer"
+description: "Commands for the Peon Trainer exercise reminder system"
+---
+
+## Overview
+
+Peon Trainer is a built-in exercise reminder system. The same orc who tells you "work work" now tells you to drop and give him twenty. No background daemon — reminders piggyback on your coding sessions.
+
+**How It Works:**
+1. Start a new session → immediate reminder to do pushups before you code
+2. After ~20 minutes of active coding → reminder to do more reps
+3. Log reps with `peon trainer log`
+4. Progress resets at midnight
+
+## trainer on
+
+Enable trainer mode.
+
+```bash
+peon trainer on
+```
+
+**Output:**
+```
+peon-ping: trainer enabled
+```
+
+**Behavior:**
+- Enables exercise reminders during coding sessions
+- First session start plays greeting + pushup reminder
+- Subsequent reminders every ~20 minutes of active coding
+- Persists across terminal sessions
+
+## trainer off
+
+Disable trainer mode.
+
+```bash
+peon trainer off
+```
+
+**Output:**
+```
+peon-ping: trainer disabled
+```
+
+**Behavior:**
+- Stops exercise reminders
+- Progress tracking continues (data not deleted)
+- Re-enable with `peon trainer on` to resume
+
+## trainer status
+
+Show today's exercise progress.
+
+```bash
+peon trainer status
+```
+
+**Output (with progress):**
+```
+peon-ping: trainer status (2024-01-15)
+  pushups:  75 / 300  (25%)
+  squats:   50 / 300  (17%)
+  situps:   0 / 300   (0%)
+```
+
+**Output (no activity today):**
+```
+peon-ping: trainer status (2024-01-15)
+  No reps logged today. Get moving!
+```
+
+**Behavior:**
+- Shows current date
+- Lists all exercises with progress toward daily goal
+- Progress resets automatically at midnight
+- Goals default to 300 reps per exercise (configurable)
+
+## trainer log
+
+Log exercise reps.
+
+```bash
+peon trainer log <count> <exercise>
+```
+
+**Examples:**
+
+```bash
+peon trainer log 25 pushups
+```
+
+**Output:**
+```
+peon-ping: logged 25 pushups (75/300)
+```
+
+```bash
+peon trainer log 30 squats
+```
+
+**Output:**
+```
+peon-ping: logged 30 squats (80/300)
+```
+
+**Behavior:**
+- Accepts any exercise name (lowercase, alphanumeric + underscores)
+- Adds to today's total for that exercise
+- Progress saved to `.state.json`
+- Plays acknowledgment sound ("Work work! Muscles getting bigger maybe!")
+
+**Goal Completion:**
+
+```bash
+peon trainer log 50 pushups
+# (brings total to 300/300)
+```
+
+**Output:**
+```
+peon-ping: logged 50 pushups (300/300)
+Zug zug! Human finish all reps!
+```
+
+Plays celebration sound when reaching daily goal.
+
+**Exercise Name Format:**
+- Lowercase
+- Spaces converted to underscores
+- Valid: `pushups`, `squats`, `pull_ups`, `burpees`
+- Invalid: `Push-ups!`, `123`
+
+## trainer goal
+
+Get or set daily exercise goals.
+
+### Set Goal for All Exercises
+
+```bash
+peon trainer goal 200
+```
+
+**Output:**
+```
+peon-ping: daily goal set to 200 for all exercises
+```
+
+**Behavior:**
+- Applies to all current and future exercises
+- Default: `300`
+
+### Set Goal for Specific Exercise
+
+```bash
+peon trainer goal pushups 400
+```
+
+**Output:**
+```
+peon-ping: pushups goal set to 400
+```
+
+**Behavior:**
+- Overrides the global goal for one exercise
+- Other exercises continue using global goal
+
+### Get Current Goals
+
+```bash
+peon trainer goal
+```
+
+**Output:**
+```
+peon-ping: trainer goals
+  global:   300
+  pushups:  400 (custom)
+  squats:   300 (global)
+```
+
+## Slash Command (Claude Code)
+
+Log reps without leaving your conversation:
+
+```
+/peon-ping-log 25 pushups
+```
+
+**Output in chat:**
+```
+Logged 25 pushups. Keep it up! (75/300)
+```
+
+**Behavior:**
+- Same as `peon trainer log 25 pushups`
+- Useful for staying in flow
+
+## Reminder Timing
+
+### Session Start Reminder
+
+Triggers immediately when starting a new coding session:
+
+```
+🎵 "Pushups first, code second! Zug zug!"
+```
+
+### Periodic Reminders
+
+After ~20 minutes of active coding (measured by hook events, not wall time):
+
+```
+🎵 "Something need doing? YES. PUSHUPS."
+```
+
+**Reminder Frequency:**
+- Only during active sessions (not when idle)
+- No reminders when paused (`peon pause`)
+- Cooldown period prevents spam
+
+## Progress Tracking
+
+Progress is stored in `.state.json` under the `trainer` key:
+
+```json
+{
+  "trainer": {
+    "enabled": true,
+    "goals": {
+      "global": 300,
+      "pushups": 400
+    },
+    "daily": {
+      "2024-01-15": {
+        "pushups": 75,
+        "squats": 50
+      }
+    }
+  }
+}
+```
+
+**Data Retention:**
+- Only today's progress is kept
+- Previous days are automatically pruned at midnight
+- Historical tracking not implemented (feature request welcome)
+
+## Custom Voice Lines
+
+Drop your own audio files into `~/.claude/hooks/peon-ping/trainer/sounds/`:
+
+```
+trainer/sounds/
+  session_start/   # Greeting ("Pushups first, code second! Zug zug!")
+  remind/          # Reminder lines ("Something need doing? YES. PUSHUPS.")
+  log/             # Acknowledgment ("Work work! Muscles getting bigger maybe!")
+  complete/        # Celebration ("Zug zug! Human finish all reps!")
+  slacking/        # Disappointment ("Peon very disappointed.")
+```
+
+**Manifest:**
+
+Update `trainer/manifest.json` to register your files:
+
+```json
+{
+  "categories": {
+    "session_start": {
+      "sounds": [
+        { "file": "custom_greeting.wav" }
+      ]
+    },
+    "remind": {
+      "sounds": [
+        { "file": "do_pushups.wav" },
+        { "file": "drop_and_give_me_twenty.wav" }
+      ]
+    }
+  }
+}
+```
+
+## Examples
+
+### Enable Trainer and Set Moderate Goals
+
+```bash
+peon trainer on
+peon trainer goal 200
+peon trainer log 25 pushups
+peon trainer log 30 squats
+peon trainer status
+```
+
+**Output:**
+```
+peon-ping: trainer enabled
+peon-ping: daily goal set to 200 for all exercises
+peon-ping: logged 25 pushups (25/200)
+peon-ping: logged 30 squats (30/200)
+peon-ping: trainer status (2024-01-15)
+  pushups:  25 / 200  (12%)
+  squats:   30 / 200  (15%)
+```
+
+### Track Multiple Exercises with Different Goals
+
+```bash
+peon trainer goal 300
+peon trainer goal pullups 50
+peon trainer goal planks 10
+
+peon trainer log 10 pushups
+peon trainer log 5 pullups
+peon trainer log 2 planks
+
+peon trainer status
+```
+
+**Output:**
+```
+peon-ping: trainer status (2024-01-15)
+  pushups:  10 / 300  (3%)
+  pullups:  5 / 50    (10%)
+  planks:   2 / 10    (20%)
+```
+
+### Complete a Goal Mid-Day
+
+```bash
+peon trainer log 50 pushups
+# (assume already at 250/300)
+```
+
+**Output:**
+```
+peon-ping: logged 50 pushups (300/300)
+🎵 "Zug zug! Human finish all reps!"
+```
+
+### Check Progress Before Midnight
+
+```bash
+peon trainer status
+```
+
+**Output (approaching midnight):**
+```
+peon-ping: trainer status (2024-01-15)
+  pushups:  280 / 300  (93%)
+  squats:   295 / 300  (98%)
+  situps:   150 / 300  (50%)
+```
+
+**After Midnight:**
+```
+peon-ping: trainer status (2024-01-16)
+  No reps logged today. Get moving!
+```
+
+## Related Commands
+
+- `peon status` — Shows if trainer is enabled (includes trainer status in output)
+- `peon pause` — Mutes trainer reminders (along with all other sounds)
+- `peon volume` — Adjust trainer voice line volume

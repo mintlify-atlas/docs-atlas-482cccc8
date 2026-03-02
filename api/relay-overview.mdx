@@ -1,0 +1,168 @@
+---
+title: Relay Protocol Overview
+description: HTTP relay server for remote development (SSH, devcontainers, Codespaces)
+---
+
+# Relay Protocol Overview
+
+The PeonPing **relay server** routes audio and notifications from remote coding sessions (SSH, devcontainers, Codespaces) to your local machine.
+
+## Problem: Remote Development Has No Audio
+
+When coding on a remote server or inside a container:
+
+- **No audio device** — remote Linux servers don't have speakers
+- **No notification system** — containers can't send desktop notifications
+- **SSH tunneling needed** — audio must route back to your laptop
+
+## Solution: Local Relay Server
+
+The relay runs on your **local machine** (laptop/desktop) and exposes an HTTP API. Remote peon-ping hooks send audio/notification requests to the relay, which plays sounds and shows notifications locally.
+
+```
+┌─────────────────────┐         ┌──────────────────┐
+│  Remote Server      │         │  Local Machine   │
+│                     │         │                  │
+│  peon.sh            │  HTTP   │  relay.sh        │
+│  (detects SSH)      ├────────>│  (plays audio)   │
+│                     │ :19998  │                  │
+└─────────────────────┘         └──────────────────┘
+```
+
+## Quick Start
+
+### 1. Start Relay (Local Machine)
+
+```bash
+peon relay --daemon
+```
+
+This starts the relay server on `localhost:19998`.
+
+### 2. SSH with Port Forwarding
+
+```bash
+ssh -R 19998:localhost:19998 your-server
+```
+
+The `-R` flag creates a reverse tunnel: connections to `localhost:19998` on the remote server forward to `localhost:19998` on your local machine.
+
+### 3. Install peon-ping on Remote
+
+```bash
+curl -fsSL https://peonping.com/install | bash
+```
+
+Peon-ping auto-detects SSH sessions (via `SSH_CONNECTION` env var) and routes audio to `localhost:19998`.
+
+## Auto-Detection
+
+Peon-ping detects remote environments automatically:
+
+| Environment | Detection | Relay Host | Relay Port |
+|---|---|---|---|
+| **SSH** | `SSH_CONNECTION` or `SSH_CLIENT` env var | `localhost` | `19998` |
+| **Devcontainer** | `REMOTE_CONTAINERS=true` | `host.docker.internal` | `19998` |
+| **Codespaces** | `CODESPACES=true` | `host.docker.internal` | `19998` |
+
+No manual configuration needed.
+
+## Relay Commands
+
+```bash
+peon relay                  # Start in foreground (for debugging)
+peon relay --daemon         # Start in background
+peon relay --stop           # Stop background relay
+peon relay --status         # Check if relay is running
+peon relay --port=12345     # Custom port (default: 19998)
+peon relay --bind=0.0.0.0   # Listen on all interfaces (less secure)
+```
+
+## Environment Variables
+
+<ParamField path="PEON_RELAY_PORT" type="number" default="19998">
+  Port the relay server listens on (local machine)
+</ParamField>
+
+<ParamField path="PEON_RELAY_HOST" type="string" default="localhost">
+  Hostname remote sessions connect to (usually `localhost` with SSH forwarding, or `host.docker.internal` for containers)
+</ParamField>
+
+<ParamField path="PEON_RELAY_BIND" type="string" default="127.0.0.1">
+  Address to bind to on local machine. Use `0.0.0.0` to accept connections from other machines (e.g., remote SSH without port forwarding). **Security warning:** binding to `0.0.0.0` allows anyone on your network to trigger sounds.
+</ParamField>
+
+## Endpoints
+
+See [Relay Endpoints](/api/relay-endpoints) for full API reference.
+
+## Security
+
+By default, the relay binds to `127.0.0.1` (localhost only):
+
+- **SSH with forwarding** — safe (tunnel is encrypted)
+- **Docker containers** — safe (`host.docker.internal` is isolated)
+- **Network access** — blocked (only localhost can connect)
+
+If you use `--bind=0.0.0.0`:
+
+- **Anyone on your network** can send requests
+- **No authentication** — endpoint is public
+- **Recommendation:** use SSH port forwarding instead
+
+## Platform Support
+
+| Platform | Audio Backend | Notification Backend |
+|---|---|---|
+| macOS | `afplay` or `peon-play` | JXA overlay or `osascript` |
+| Linux | PipeWire, PulseAudio, ffplay, mpv | `notify-send` |
+| Windows/WSL2 | PowerShell MediaPlayer | Windows toast or Forms overlay |
+
+The relay uses the **same audio/notification backends** as local peon-ping.
+
+## Devcontainers and Codespaces
+
+No SSH forwarding needed — `host.docker.internal` routes to your host machine automatically:
+
+1. Start relay on host: `peon relay --daemon`
+2. Install peon-ping in container: `curl -fsSL https://peonping.com/install | bash`
+3. Peon-ping auto-detects `REMOTE_CONTAINERS` or `CODESPACES` and uses `host.docker.internal:19998`
+
+## Troubleshooting
+
+### Connection Refused
+
+```
+curl: (7) Failed to connect to localhost port 19998: Connection refused
+```
+
+**Solution:** Start the relay on your local machine (`peon relay --daemon`).
+
+### Wrong Host
+
+```
+curl: (6) Could not resolve host: host.docker.internal
+```
+
+**Solution:** You're not in a container. For SSH, use `localhost` (not `host.docker.internal`).
+
+### No Sound
+
+Relay returns `OK` but no sound plays:
+
+1. Check local audio backend: `peon status`
+2. Check relay logs: `tail -f ~/.claude/hooks/peon-ping/.relay.log`
+3. Test local playback: `afplay <sound.wav>` (macOS) or `pw-play <sound.wav>` (Linux)
+
+### Wrong Pack
+
+Relay plays sounds from the wrong pack:
+
+- The relay reads `config.json` on your **local machine**
+- Change pack locally: `peon packs use <name>`
+- Remote config files have no effect on relay playback
+
+## See Also
+
+- [Relay Endpoints](/api/relay-endpoints) — HTTP API reference
+- [Remote Development](https://github.com/PeonPing/peon-ping#remote-development-ssh--devcontainers--codespaces) — full setup guide

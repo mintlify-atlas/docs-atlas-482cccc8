@@ -1,0 +1,548 @@
+---
+title: "Relay"
+description: "Commands for the audio relay server used in SSH, devcontainer, and Codespaces sessions"
+---
+
+## Overview
+
+The relay server routes audio and notifications from remote/container environments back to your local machine. When you code over SSH or inside a devcontainer, the relay ensures you hear sounds and see notifications on your laptop.
+
+**How It Works:**
+1. Start relay on your local machine: `peon relay --daemon`
+2. SSH with port forwarding: `ssh -R 19998:localhost:19998 remote-host`
+3. PeonPing on the remote auto-detects SSH and sends requests to `localhost:19998`
+4. Relay plays sounds locally
+
+## relay (foreground)
+
+Start the relay server in the foreground.
+
+```bash
+peon relay
+```
+
+**Output:**
+```
+peon-ping relay v2.0 (category-aware)
+  Listening: 127.0.0.1:19998
+  Peon dir:  /Users/you/.claude/hooks/peon-ping
+  Platform:  mac
+  Press Ctrl+C to stop
+```
+
+**Behavior:**
+- Blocks the terminal (foreground process)
+- Logs requests to stdout
+- Stop with `Ctrl+C`
+
+**Default Settings:**
+- **Port:** `19998`
+- **Bind address:** `127.0.0.1` (localhost only)
+- **Peon dir:** `~/.claude/hooks/peon-ping` (or `CLAUDE_PEON_DIR`)
+
+## relay --daemon
+
+Start the relay server in the background.
+
+```bash
+peon relay --daemon
+```
+
+**Output:**
+```
+peon-ping relay started in background (PID 12345)
+  Listening: 127.0.0.1:19998
+  Log: /Users/you/.claude/hooks/peon-ping/.relay.log
+  Stop: peon relay --stop
+```
+
+**Behavior:**
+- Forks to background
+- Writes PID to `.relay.pid`
+- Logs to `.relay.log`
+- Persists across terminal sessions
+- Only one daemon can run at a time (second invocation detects existing PID)
+
+**Log Location:**
+```bash
+tail -f ~/.claude/hooks/peon-ping/.relay.log
+```
+
+## relay --stop
+
+Stop the background relay.
+
+```bash
+peon relay --stop
+```
+
+**Output:**
+```
+peon-ping relay stopped (PID 12345)
+```
+
+**Output (not running):**
+```
+peon-ping relay is not running (no PID file)
+```
+
+**Behavior:**
+- Sends `SIGTERM` to relay process
+- Removes `.relay.pid` file
+- Cleans up stale PID files if process no longer exists
+
+## relay --status
+
+Check if the relay is running.
+
+```bash
+peon relay --status
+```
+
+**Output (running):**
+```
+peon-ping relay is running (PID 12345, port 19998)
+```
+
+**Output (not running):**
+```
+peon-ping relay is not running
+```
+
+**Exit Code:**
+- `0` if running
+- `1` if not running
+
+**Use in Scripts:**
+```bash
+if ! peon relay --status &>/dev/null; then
+  peon relay --daemon
+fi
+```
+
+## relay --port
+
+Use a custom port.
+
+```bash
+peon relay --daemon --port=12345
+```
+
+**Output:**
+```
+peon-ping relay started in background (PID 12346)
+  Listening: 127.0.0.1:12345
+  Log: /Users/you/.claude/hooks/peon-ping/.relay.log
+  Stop: peon relay --stop
+```
+
+**Environment Variable:**
+```bash
+export PEON_RELAY_PORT=12345
+peon relay --daemon
+```
+
+**SSH Forwarding:**
+```bash
+ssh -R 12345:localhost:12345 remote-host
+```
+
+Remote sessions must set the same port:
+```bash
+export PEON_RELAY_PORT=12345
+```
+
+## relay --bind
+
+Bind to a specific address.
+
+```bash
+peon relay --daemon --bind=0.0.0.0
+```
+
+**Output:**
+```
+peon-ping relay started in background (PID 12347)
+  Listening: 0.0.0.0:19998
+  Log: /Users/you/.claude/hooks/peon-ping/.relay.log
+  Stop: peon relay --stop
+```
+
+**Security Warning:**
+- `0.0.0.0` listens on ALL network interfaces
+- Anyone on your network can send requests
+- Only use on trusted networks
+- Default `127.0.0.1` is safer (localhost only)
+
+**Environment Variable:**
+```bash
+export PEON_RELAY_BIND=0.0.0.0
+peon relay --daemon
+```
+
+## relay --peon-dir
+
+Use a custom peon-ping directory.
+
+```bash
+peon relay --daemon --peon-dir=/path/to/custom/peonping
+```
+
+**Behavior:**
+- Relay reads `config.json` and loads packs from this directory
+- Useful for testing or multi-user setups
+- Falls back to `CLAUDE_PEON_DIR` environment variable
+
+## relay --help
+
+Show help message.
+
+```bash
+peon relay --help
+```
+
+**Output:**
+```
+Usage: peon relay [--port=PORT] [--bind=ADDR] [--peon-dir=DIR]
+
+Starts the peon-ping audio relay server on this machine.
+Remote SSH sessions and devcontainers send audio requests to this relay.
+
+Options:
+  --port=PORT       Port to listen on (default: 19998)
+  --bind=ADDR       Address to bind to (default: 127.0.0.1)
+  --peon-dir=DIR    peon-ping install directory
+  --daemon          Run in background (writes PID to .relay.pid)
+  --stop            Stop a background relay
+  --status          Check if a background relay is running
+
+Environment variables:
+  PEON_RELAY_PORT   Same as --port
+  PEON_RELAY_BIND   Same as --bind
+  CLAUDE_PEON_DIR   Same as --peon-dir
+
+SSH setup:
+  1. On your LOCAL machine: peon relay --daemon
+  2. Connect with: ssh -R 19998:localhost:19998 <host>
+  3. peon-ping on the remote will auto-detect SSH and use the relay
+
+Endpoints:
+  GET /health                 Health check
+  GET /play?file=<path>       Play specific sound file
+  GET /play?category=<cat>    Play random sound from category
+  POST /notify                Send desktop notification
+```
+
+## Relay Endpoints
+
+The relay exposes an HTTP API for remote clients.
+
+### GET /health
+
+Health check.
+
+```bash
+curl http://localhost:19998/health
+```
+
+**Response:**
+```
+OK
+```
+
+**Use Case:**
+- Verify relay is running before starting SSH session
+- Monitoring scripts
+
+### GET /play?category=\{category\}
+
+Play a random sound from a CESP category.
+
+```bash
+curl "http://localhost:19998/play?category=task.complete"
+```
+
+**Response:**
+```
+OK: PeonYes1.wav
+```
+
+**Behavior:**
+- Relay reads `config.json` to get active pack and volume
+- Loads pack's `openpeon.json` manifest
+- Picks a random sound from category (avoids last-played sound)
+- Plays on local machine
+
+**Available Categories:**
+- `session.start`
+- `task.acknowledge`
+- `task.complete`
+- `task.error`
+- `input.required`
+- `resource.limit`
+- `user.spam`
+
+**Error Response (category not found):**
+```
+404 No sounds for category: nonexistent
+```
+
+### GET /play?file=\{path\}
+
+Play a specific sound file (legacy).
+
+```bash
+curl "http://localhost:19998/play?file=packs/peon/sounds/PeonYes1.wav"
+```
+
+**Response:**
+```
+OK
+```
+
+**Behavior:**
+- Path is relative to peon-ping directory
+- Subject to path traversal protection (must be within `packs/`)
+- Volume controlled by `X-Volume` header (default: 0.5)
+
+**Custom Volume:**
+```bash
+curl -H "X-Volume: 0.8" "http://localhost:19998/play?file=packs/peon/sounds/PeonYes1.wav"
+```
+
+### POST /notify
+
+Send a desktop notification.
+
+```bash
+curl -X POST \
+  -H "Content-Type: application/json" \
+  -d '{"title":"peon-ping","message":"Task complete","color":"blue"}' \
+  http://localhost:19998/notify
+```
+
+**Response:**
+```
+OK
+```
+
+**JSON Fields:**
+
+| Field | Type | Description |
+|-------|------|-------------|
+| `title` | string | Notification title (max 256 chars) |
+| `message` | string | Notification body (max 512 chars) |
+| `color` | string | `red`, `yellow`, or `blue` (affects urgency) |
+
+## SSH Setup
+
+### 1. Start Relay Locally
+
+```bash
+peon relay --daemon
+```
+
+### 2. SSH with Port Forwarding
+
+```bash
+ssh -R 19998:localhost:19998 user@remote-host
+```
+
+**Explanation:**
+- `-R 19998:localhost:19998` forwards remote port `19998` to local `19998`
+- PeonPing on `remote-host` sends requests to `localhost:19998`
+- SSH tunnel routes them back to your laptop
+
+### 3. Verify on Remote
+
+```bash
+# On remote-host
+curl http://localhost:19998/health
+# Output: OK
+```
+
+### 4. Test Sound
+
+```bash
+# On remote-host
+peon preview session.start
+# Sound plays on your LOCAL laptop
+```
+
+## Devcontainer / Codespaces Setup
+
+No SSH forwarding needed — PeonPing auto-detects container environments.
+
+### 1. Start Relay on Host
+
+```bash
+# On your laptop (host machine)
+peon relay --daemon
+```
+
+### 2. Open Devcontainer
+
+PeonPing inside the container auto-detects `REMOTE_CONTAINERS` or `CODESPACES` env vars and routes requests to `host.docker.internal:19998`.
+
+### 3. Test
+
+```bash
+# Inside devcontainer
+curl http://host.docker.internal:19998/health
+# Output: OK
+
+peon preview task.complete
+# Sound plays on host
+```
+
+## Remote Hook (Lightweight)
+
+If peon-ping isn't installed on the remote, use a minimal hook that sends category names to the relay:
+
+**`scripts/remote-hook.sh`:**
+```bash
+#!/bin/bash
+RELAY_URL="${PEON_RELAY_URL:-http://127.0.0.1:19998}"
+EVENT=$(cat | python3 -c "import sys,json; d=json.load(sys.stdin); print(d.get('hook_event_name',''))" 2>/dev/null)
+case "$EVENT" in
+  SessionStart)      CATEGORY="session.start" ;;
+  Stop)              CATEGORY="task.complete" ;;
+  PermissionRequest) CATEGORY="input.required" ;;
+  *)                 exit 0 ;;
+esac
+curl -sf "${RELAY_URL}/play?category=${CATEGORY}" >/dev/null 2>&1 &
+```
+
+**Register in `~/.claude/settings.json` on remote:**
+```json
+{
+  "hooks": {
+    "SessionStart": [{"command": "bash /path/to/remote-hook.sh"}],
+    "Stop": [{"command": "bash /path/to/remote-hook.sh"}],
+    "PermissionRequest": [{"command": "bash /path/to/remote-hook.sh"}]
+  }
+}
+```
+
+**Benefits:**
+- No peon-ping install on remote
+- Relay handles pack selection, volume, and no-repeat logic
+- Hook only needs to send category name
+
+## Examples
+
+### Start Relay and SSH to Server
+
+```bash
+# Local machine
+peon relay --daemon
+
+# Connect to remote with forwarding
+ssh -R 19998:localhost:19998 user@dev-server
+
+# On remote
+peon preview task.complete
+# Plays locally
+```
+
+### Custom Port for Multiple Remotes
+
+```bash
+# Local machine
+peon relay --daemon --port=19999
+
+# Remote A: forward to 19999
+ssh -R 19999:localhost:19999 user@remote-a
+export PEON_RELAY_PORT=19999
+
+# Remote B: use default relay at 19998
+ssh -R 19998:localhost:19998 user@remote-b
+```
+
+### Persistent Relay on Startup
+
+Add to `~/.bashrc` or `~/.zshrc`:
+
+```bash
+if ! peon relay --status &>/dev/null; then
+  peon relay --daemon
+fi
+```
+
+Relay auto-starts when you open a terminal.
+
+### Check Relay Logs
+
+```bash
+tail -f ~/.claude/hooks/peon-ping/.relay.log
+```
+
+**Example Log Output:**
+```
+peon-ping relay v2.0 (category-aware)
+  Listening: 127.0.0.1:19998
+  Peon dir:  /Users/you/.claude/hooks/peon-ping
+  Platform:  mac
+  Press Ctrl+C to stop
+
+# Requests appear here when remote sends audio
+```
+
+## Troubleshooting
+
+### Relay Not Running
+
+```bash
+peon relay --status
+# Output: peon-ping relay is not running
+
+peon relay --daemon
+```
+
+### Port Already in Use
+
+```bash
+peon relay --daemon
+# Error: Address already in use
+
+# Check what's using port 19998
+lsof -i :19998
+
+# Kill old relay or use different port
+peon relay --stop
+peon relay --daemon --port=12345
+```
+
+### Remote Can't Reach Relay
+
+```bash
+# On remote
+curl http://localhost:19998/health
+# Error: Connection refused
+
+# Check SSH forwarding
+ssh -R 19998:localhost:19998 user@remote-host
+
+# Verify relay is running locally
+peon relay --status
+```
+
+### Sounds Play on Remote Instead of Local
+
+PeonPing falls back to remote playback if relay is unreachable:
+
+```bash
+# On remote, check env detection
+echo $SSH_CONNECTION
+# Should output: <client-ip> <port> <server-ip> <port>
+
+# If not detected as SSH, manually set relay host
+export PEON_RELAY_HOST=localhost
+export PEON_RELAY_PORT=19998
+```
+
+## Related Commands
+
+- `peon status` — Shows if you're in SSH/devcontainer (relay auto-detection)
+- `peon preview <category>` — Test sounds through relay
+- `peon volume` — Adjust volume on local machine (relay respects this)

@@ -1,0 +1,128 @@
+---
+title: 'Kilo CLI'
+description: 'TypeScript plugin adapter for Kilo CLI (OpenCode fork)'
+---
+
+Kilo CLI is a fork of OpenCode and uses the same plugin system. PeonPing provides a native TypeScript plugin with full CESP v1.0 support.
+
+## Setup
+
+<Steps>
+  <Step title="Install the plugin">
+    ```bash
+    curl -fsSL https://raw.githubusercontent.com/PeonPing/peon-ping/main/adapters/kilo.sh | bash
+    ```
+
+    Or if you already have PeonPing installed:
+
+    ```bash
+    bash ~/.claude/hooks/peon-ping/adapters/kilo.sh
+    ```
+  </Step>
+
+  <Step title="Restart Kilo CLI">
+    The plugin activates on next launch. You'll hear a greeting sound when Kilo starts.
+  </Step>
+</Steps>
+
+## How It Works
+
+The installer:
+
+1. Downloads the OpenCode plugin (`peon-ping.ts`)
+2. Patches it for Kilo CLI:
+   - Replaces `@opencode-ai/plugin` with `@kilocode/plugin`
+   - Changes config path from `~/.config/opencode/` to `~/.config/kilo/`
+   - Updates session ID prefix (`oc-` → `kilo-`)
+3. Copies to `~/.config/kilo/plugins/peon-ping.ts`
+4. Creates `~/.config/kilo/peon-ping/config.json`
+5. Installs the default pack (`peon`) from the registry to `~/.openpeon/packs/`
+
+### Patch Details
+
+The installer applies these transformations:
+
+```bash
+sed \
+  -e 's|"@opencode-ai/plugin"|"@kilocode/plugin"|g' \
+  -e 's|".config", "opencode", "peon-ping"|".config", "kilo", "peon-ping"|g' \
+  -e 's|`oc-\${Date.now()}`|`kilo-${Date.now()}`|g' \
+  -e 's|) || "opencode"|) || "kilo"|g'
+```
+
+## Event Mapping
+
+| Kilo CLI Event | CESP Category | Trigger |
+|----------------|---------------|---------|
+| Plugin init / `session.created` | `session.start` | Kilo launches, session starts |
+| `session.status` (busy) | `task.acknowledge` | Agent accepts work |
+| `session.idle` | `task.complete` | Agent finishes turn |
+| `session.error` | `task.error` | Error occurs |
+| `permission.asked` | `input.required` | Permission prompt |
+| Rapid prompts detected | `user.spam` | 3+ prompts in 10 seconds |
+
+Identical to [OpenCode](/integrations/opencode) event mapping.
+
+## Features
+
+All OpenCode features are supported:
+
+- **Terminal focus detection** — Notifications only when terminal is not focused
+- **Tab titles** — `● project: done` / `✗ project: error`
+- **Subagent filtering** — Skip sounds for parallel Task tool sessions
+- **Pack rotation** — Per-session pack switching
+- **SSH/devcontainer relay** — Audio routing to local machine
+
+See [OpenCode integration](/integrations/opencode) for full feature details.
+
+## Configuration
+
+Config path: `~/.config/kilo/peon-ping/config.json`
+
+```json
+{
+  "active_pack": "peon",
+  "volume": 0.5,
+  "enabled": true,
+  "desktop_notifications": true,
+  "categories": {
+    "session.start": true,
+    "task.complete": true,
+    "task.error": true,
+    "input.required": true,
+    "user.spam": true
+  },
+  "spam_threshold": 3,
+  "spam_window_seconds": 10,
+  "pack_rotation": [],
+  "debounce_ms": 500
+}
+```
+
+See [Configuration](/configuration/overview) for all options.
+
+## Uninstall
+
+```bash
+bash ~/.claude/hooks/peon-ping/adapters/kilo.sh --uninstall
+```
+
+Or manually:
+
+```bash
+rm -f ~/.config/kilo/plugins/peon-ping.ts
+rm -rf ~/.config/kilo/peon-ping
+```
+
+Sound packs in `~/.openpeon/packs/` are preserved (shared with other adapters).
+
+## Differences from OpenCode
+
+| Feature | OpenCode | Kilo CLI |
+|---------|----------|----------|
+| Import path | `@opencode-ai/plugin` | `@kilocode/plugin` |
+| Config dir | `~/.config/opencode/` | `~/.config/kilo/` |
+| Session ID prefix | `oc-` | `kilo-` |
+| Project name fallback | `"opencode"` | `"kilo"` |
+
+All other functionality is identical.

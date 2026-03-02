@@ -1,0 +1,286 @@
+---
+title: Peon Trainer
+description: Built-in exercise reminder system that nags you to do pushups, squats, and more during coding sessions
+---
+
+Your peon is also your personal trainer. The same orc who tells you *"work work"* now tells you to drop and give him twenty.
+
+## Quick Start
+
+```bash
+peon trainer on              # Enable trainer
+peon trainer goal 200        # Set daily goal for all exercises
+# ... code for a while, peon nags you every ~20 min ...
+peon trainer log 25 pushups  # Log what you did
+peon trainer log 30 squats
+peon trainer status          # Check progress
+```
+
+**Output of `peon trainer status`:**
+```
+Peon Trainer Status
+━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━
+Daily Goals:
+  pushups:  75 / 300  (25%)
+  squats:   30 / 300  (10%)
+
+Last reminder: 18 minutes ago
+Next reminder: ~2 minutes (if coding session active)
+```
+
+## How It Works
+
+**Trainer reminders piggyback on your coding session.**
+
+1. **Session start:** When you start a new session, the peon immediately encourages you to do pushups before writing any code
+2. **Active coding:** Every ~20 minutes of coding, you'll hear the peon yelling at you to do more reps
+3. **No background daemon:** Reminders only fire when you're actively working with the agent
+4. **Progress tracking:** Log your reps with `peon trainer log`, and progress resets automatically at midnight
+
+## Commands
+
+<Tabs>
+  <Tab title="Enable/Disable">
+    ```bash
+    peon trainer on      # Enable trainer mode
+    peon trainer off     # Disable trainer mode
+    peon trainer status  # Show today's progress
+    ```
+  </Tab>
+  
+  <Tab title="Logging Reps">
+    ```bash
+    peon trainer log <n> <exercise>
+    ```
+    
+    **Examples:**
+    ```bash
+    peon trainer log 25 pushups
+    peon trainer log 30 squats
+    peon trainer log 50 jumping_jacks
+    peon trainer log 10 pullups
+    ```
+    
+    **Exercise names:** Any string (case-insensitive, spaces converted to underscores)
+  </Tab>
+  
+  <Tab title="Setting Goals">
+    ```bash
+    # Set goal for all exercises
+    peon trainer goal 200
+    
+    # Set goal for specific exercise
+    peon trainer goal pushups 500
+    peon trainer goal squats 300
+    ```
+    
+    **Default:** 300 for all exercises
+  </Tab>
+</Tabs>
+
+## Claude Code Skill
+
+Log reps without leaving your conversation:
+
+```
+/peon-ping-log 25 pushups
+/peon-ping-log 30 squats
+```
+
+**Response:**
+```
+Logged 25 pushups. Today's total: 75 / 300 (25%)
+```
+
+This uses the `/peon-ping-log` slash command installed by PeonPing.
+
+## Configuration
+
+Trainer settings in `~/.claude/hooks/peon-ping/config.json`:
+
+```json
+{
+  "trainer": {
+    "enabled": false,
+    "exercises": {
+      "pushups": 300,
+      "squats": 300
+    },
+    "reminder_interval_minutes": 20,
+    "reminder_min_gap_minutes": 5
+  }
+}
+```
+
+### Configuration Keys
+
+| Key | Type | Default | Description |
+|-----|------|---------|-------------|
+| `enabled` | boolean | `false` | Master toggle for trainer mode |
+| `exercises` | object | `{"pushups": 300, "squats": 300}` | Daily goals per exercise |
+| `reminder_interval_minutes` | number | `20` | Target time between reminders during coding |
+| `reminder_min_gap_minutes` | number | `5` | Minimum time between reminders (prevents spam) |
+
+### How Reminders Trigger
+
+1. **Session start:** First reminder plays immediately (encourages you to start strong)
+2. **Subsequent reminders:** Only fire if:
+   - At least `reminder_min_gap_minutes` have passed since last reminder
+   - At least `reminder_interval_minutes` have passed since last reminder OR last log
+3. **No background process:** Reminders only check on new agent sessions, not on a timer
+
+**Example timeline:**
+```
+9:00 AM  — Session starts → "Pushups first, code second! Zug zug!"
+9:20 AM  — New session → "Something need doing? YES. PUSHUPS."
+9:25 AM  — peon trainer log 25 pushups
+9:45 AM  — New session → "Me not hearing pushups! Get to work!"
+```
+
+## Custom Voice Lines
+
+Replace default trainer sounds with your own audio:
+
+### Directory Structure
+
+```
+~/.claude/hooks/peon-ping/trainer/sounds/
+├── session_start/     # Session greeting ("Pushups first, code second!")
+├── remind/            # Reminder lines ("Something need doing? YES. PUSHUPS.")
+├── log/               # Acknowledgment ("Work work! Muscles getting bigger maybe!")
+├── complete/          # Celebration ("Zug zug! Human finish all reps!")
+└── slacking/          # Disappointment ("Peon very disappointed.")
+```
+
+### Add Your Own Sounds
+
+1. Place `.wav` or `.mp3` files in the appropriate category folder
+2. Update `trainer/manifest.json` to register your files:
+
+```json
+{
+  "version": "1.0",
+  "categories": {
+    "session_start": [
+      {"file": "session_start/custom1.wav", "label": "Let's pump iron!"},
+      {"file": "session_start/custom2.wav", "label": "Time to get swole!"}
+    ],
+    "remind": [
+      {"file": "remind/nag1.wav", "label": "Drop and give me twenty!"},
+      {"file": "remind/nag2.wav", "label": "No coding without squats!"}
+    ],
+    "log": [
+      {"file": "log/nice.wav", "label": "Nice work!"}
+    ],
+    "complete": [
+      {"file": "complete/goal_met.wav", "label": "Goal crushed!"}
+    ],
+    "slacking": [
+      {"file": "slacking/disappointed.wav", "label": "Do you even lift?"}
+    ]
+  }
+}
+```
+
+3. Test your sounds:
+   ```bash
+   peon trainer on
+   # Start a new coding session to hear custom sounds
+   ```
+
+## Progress Tracking
+
+Trainer state is stored in `~/.claude/hooks/peon-ping/.trainer-state.json`:
+
+```json
+{
+  "date": "2026-03-02",
+  "exercises": {
+    "pushups": 75,
+    "squats": 30,
+    "jumping_jacks": 50
+  },
+  "last_reminder": 1709382000,
+  "last_log": 1709382300
+}
+```
+
+**Automatic reset:** State resets at midnight (local time)
+
+## Use Cases
+
+<AccordionGroup>
+  <Accordion title="Pomodoro-style breaks">
+    Set `reminder_interval_minutes` to 25 for Pomodoro-like exercise breaks:
+    
+    ```json
+    {
+      "trainer": {
+        "reminder_interval_minutes": 25
+      }
+    }
+    ```
+    
+    Code for 25 minutes → Exercise → Repeat
+  </Accordion>
+  
+  <Accordion title="Pavel-style grease-the-groove">
+    Frequent, submaximal sets throughout the day. Set low goals and log often:
+    
+    ```bash
+    peon trainer goal pushups 100
+    peon trainer goal pullups 50
+    
+    # Every reminder:
+    peon trainer log 10 pushups
+    peon trainer log 5 pullups
+    ```
+    
+    **Result:** 10+ sets spread across the day without fatigue
+  </Accordion>
+  
+  <Accordion title="Accountability without timers">
+    No need to set alarms — the peon nags you whenever you start a new task:
+    
+    ```bash
+    peon trainer on
+    peon trainer goal 300
+    ```
+    
+    Let your coding rhythm drive your exercise schedule
+  </Accordion>
+  
+  <Accordion title="Multi-exercise routines">
+    Track multiple exercises with different goals:
+    
+    ```bash
+    peon trainer goal pushups 200
+    peon trainer goal squats 300
+    peon trainer goal pullups 50
+    peon trainer goal planks 10  # 10 minutes total
+    ```
+    
+    Mix and match throughout the day
+  </Accordion>
+</AccordionGroup>
+
+## Disable Trainer Sounds (Keep Coding Sounds)
+
+If you want coding sounds but not trainer reminders:
+
+```bash
+peon trainer off
+```
+
+This disables trainer reminders while keeping all CESP event sounds active.
+
+## Related Configuration
+
+<CardGroup cols={2}>
+  <Card title="Sound Events" icon="volume-high" href="/features/sound-events">
+    Understand CESP categories and event triggers
+  </Card>
+  <Card title="Sound Packs" icon="music" href="/features/sound-packs">
+    Some packs have custom trainer sounds
+  </Card>
+</CardGroup>

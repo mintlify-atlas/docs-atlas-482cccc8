@@ -1,0 +1,40 @@
+---
+title: CESP Standard Overview
+description: Coding Event Sound Pack (CESP) specification for standardized coding event sounds
+---
+
+# CESP Standard Overview
+
+The **Coding Event Sound Pack (CESP)** standard defines a universal format for sound packs that respond to coding events in agentic IDEs. CESP enables any IDE or coding tool to trigger sounds based on standardized event categories.
+
+## What is CESP?
+
+CESP v1.0 is an open specification that:
+
+- **Standardizes event categories** — session lifecycle, task completion, errors, user input, resource limits
+- **Defines pack manifest format** — `openpeon.json` files describing sound packs
+- **Enables portability** — packs work across any CESP-compatible IDE (Claude Code, OpenCode, GitHub Copilot, etc.)
+- **Supports metadata** — display names, icons, attribution, license info
+
+## CESP Event Categories
+
+See [Event Categories](/api/event-categories) for the complete list of standardized categories.
+
+## Pack Manifest Format
+
+Every CESP-compliant sound pack includes an `openpeon.json` manifest file. See [Pack Manifest](/api/pack-manifest) for the full schema.
+
+## Specification
+
+The full CESP v1.0 specification is maintained at [openpeon.com/spec](https://openpeon.com/spec).
+
+## Implementation
+
+PeonPing implements CESP v1.0 with:
+
+- **Hook-based event mapping** — IDE hooks translate to CESP categories
+- **Manifest parsing** — loads `openpeon.json` at runtime
+- **Sound selection** — picks random sounds from categories with no-repeat logic
+- **Icon resolution** — supports per-sound, per-category, and pack-level icons
+
+See [How it works](https://github.com/PeonPing/peon-ping#how-it-works) for implementation details.

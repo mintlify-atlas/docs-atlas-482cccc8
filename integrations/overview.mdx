@@ -1,0 +1,81 @@
+---
+title: 'Multi-IDE Support'
+description: 'Integrate PeonPing with any agentic IDE through CESP adapters'
+---
+
+PeonPing works with any agentic IDE that supports hooks or event systems. Adapters translate IDE-specific events to the [CESP standard](https://github.com/PeonPing/openpeon) (Coding Event Sound Pack Specification).
+
+## Supported IDEs
+
+| IDE | Integration Type | Status |
+|-----|------------------|--------|
+| [Claude Code](/integrations/claude-code) | Built-in hooks | ✅ Native |
+| [Amp](/integrations/amp) | Filesystem watcher | ✅ Adapter |
+| [OpenCode](/integrations/opencode) | TypeScript plugin | ✅ Adapter |
+| [Cursor](/integrations/cursor) | Built-in hooks | ✅ Adapter |
+| [GitHub Copilot](/integrations/github-copilot) | hooks.json | ✅ Adapter |
+| [Gemini CLI](/integrations/gemini-cli) | settings.json | ✅ Adapter |
+| [Kilo CLI](/integrations/kilo-cli) | TypeScript plugin | ✅ Adapter |
+| [Windsurf, Kiro, Kimi Code, Antigravity, OpenClaw](/integrations/other-ides) | Various | ✅ Adapters |
+
+## Architecture
+
+All adapters follow a common pattern:
+
+1. **Event capture** — Listen for IDE-specific events (hooks, file changes, JSON-RPC)
+2. **Event mapping** — Translate events to CESP categories (`session.start`, `task.complete`, etc.)
+3. **Sound playback** — Call `peon.sh` or `peon.ps1` with standardized JSON
+
+### Adapter Types
+
+**Hook registration** (Claude Code, Cursor, GitHub Copilot, Gemini CLI)
+
+Register shell scripts in the IDE's hook configuration. The IDE calls the script when events occur, passing context via stdin.
+
+**TypeScript plugins** (OpenCode, Kilo CLI)
+
+Native plugins that hook into the IDE's event bus. Provide richer context and terminal integration.
+
+**Filesystem watchers** (Amp, Kimi Code, Antigravity)
+
+Background daemons that watch IDE data directories and emit events when files change.
+
+## CESP Event Mapping
+
+All adapters map to these standard categories:
+
+| CESP Category | Triggers |
+|---------------|----------|
+| `session.start` | IDE launches, first prompt submitted |
+| `task.complete` | Agent finishes turn, tool execution completes |
+| `task.error` | Tool fails, error occurs |
+| `input.required` | Permission prompt, user input needed |
+| `resource.limit` | Rate limit hit, token quota exceeded |
+| `user.spam` | 3+ prompts within 10 seconds |
+
+## Platform Support
+
+All adapters run on:
+
+- **macOS** — `afplay` for audio, JXA Cocoa overlays for notifications
+- **Linux** — `pw-play`/`paplay`/`aplay` for audio, `notify-send` for notifications
+- **Windows** — Native PowerShell with `MediaPlayer` and WinForms
+- **WSL2** — PowerShell fallback via `powershell.exe`
+- **SSH/Remote** — HTTP relay to local machine (see [remote development](/remote-dev))
+
+## Next Steps
+
+<CardGroup cols={2}>
+  <Card title="Claude Code" icon="terminal" href="/integrations/claude-code">
+    Built-in support via hooks.json
+  </Card>
+  <Card title="OpenCode" icon="code" href="/integrations/opencode">
+    TypeScript plugin with terminal focus detection
+  </Card>
+  <Card title="GitHub Copilot" icon="github" href="/integrations/github-copilot">
+    Repository hooks.json setup
+  </Card>
+  <Card title="Other IDEs" icon="grid" href="/integrations/other-ides">
+    Windsurf, Kiro, Kimi Code, and more
+  </Card>
+</CardGroup>

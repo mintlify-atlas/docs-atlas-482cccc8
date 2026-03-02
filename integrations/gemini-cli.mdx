@@ -1,0 +1,203 @@
+---
+title: 'Gemini CLI'
+description: 'settings.json adapter for Gemini CLI hook system'
+---
+
+Gemini CLI supports custom hooks via `~/.gemini/settings.json`. PeonPing provides a shell adapter with full CESP v1.0 conformance.
+
+## Setup
+
+<Steps>
+  <Step title="Install PeonPing">
+    ```bash
+    curl -fsSL https://raw.githubusercontent.com/PeonPing/peon-ping/main/install.sh | bash
+    ```
+  </Step>
+
+  <Step title="Add hooks to ~/.gemini/settings.json">
+    ```json
+    {
+      "hooks": {
+        "SessionStart": [
+          {
+            "matcher": "startup",
+            "hooks": [
+              {
+                "name": "peon-start",
+                "type": "command",
+                "command": "bash ~/.claude/hooks/peon-ping/adapters/gemini.sh SessionStart"
+              }
+            ]
+          }
+        ],
+        "AfterAgent": [
+          {
+            "matcher": "*",
+            "hooks": [
+              {
+                "name": "peon-after-agent",
+                "type": "command",
+                "command": "bash ~/.claude/hooks/peon-ping/adapters/gemini.sh AfterAgent"
+              }
+            ]
+          }
+        ],
+        "AfterTool": [
+          {
+            "matcher": "*",
+            "hooks": [
+              {
+                "name": "peon-after-tool",
+                "type": "command",
+                "command": "bash ~/.claude/hooks/peon-ping/adapters/gemini.sh AfterTool"
+              }
+            ]
+          }
+        ],
+        "Notification": [
+          {
+            "matcher": "*",
+            "hooks": [
+              {
+                "name": "peon-notification",
+                "type": "command",
+                "command": "bash ~/.claude/hooks/peon-ping/adapters/gemini.sh Notification"
+              }
+            ]
+          }
+        ]
+      }
+    }
+    ```
+  </Step>
+
+  <Step title="Restart Gemini CLI">
+    Hooks activate on next session.
+  </Step>
+</Steps>
+
+## How It Works
+
+Gemini CLI fires hook events and pipes JSON context to stdin:
+
+```json
+{
+  "session_id": "gemini-abc123",
+  "cwd": "/Users/dev/project",
+  "exit_code": 0,
+  "tool_name": "bash"
+}
+```
+
+The adapter transforms this to the format `peon.sh` expects:
+
+```json
+{
+  "hook_event_name": "Stop",
+  "notification_type": "",
+  "cwd": "/Users/dev/project",
+  "session_id": "gemini-abc123",
+  "permission_mode": ""
+}
+```
+
+## Event Mapping
+
+| Gemini CLI Hook | CESP Category | Trigger |
+|-----------------|---------------|---------|
+| `SessionStart` (startup matcher) | `session.start` | Gemini CLI starts |
+| `AfterAgent` | `task.complete` | Agent finishes turn |
+| `AfterTool` (success) | `task.complete` | Tool succeeds |
+| `AfterTool` (failure) | `task.error` | Tool fails (exit_code ≠ 0) |
+| `Notification` | System notification | Gemini CLI notification event |
+
+## Tool Failure Detection
+
+The adapter checks `exit_code` in `AfterTool` events:
+
+```bash
+case "$GEMINI_EVENT_TYPE" in
+  AfterTool)
+    EXIT_CODE=$(echo "$INPUT" | python3 -c "import sys, json; print(json.load(sys.stdin).get('exit_code', 0))" 2>/dev/null || echo 0)
+    if [ "$EXIT_CODE" -ne 0 ]; then
+      EVENT="PostToolUseFailure"
+      TOOL_NAME=$(echo "$INPUT" | python3 -c "import sys, json; print(json.load(sys.stdin).get('tool_name', 'unknown'))" 2>/dev/null || echo "unknown")
+    else
+      EVENT="Stop"
+    fi
+    ;;
+esac
+```
+
+Failures emit `task.error` sounds with the tool name in stderr:
+
+```bash
+if [ "$EVENT" = "PostToolUseFailure" ]; then
+  echo "$INPUT" | python3 -c "
+    payload = {
+        'hook_event_name': '$EVENT',
+        'tool_name': 'Bash',
+        'error': input_data.get('stderr', 'Tool failed')
+    }
+  " | bash "$PEON_DIR/peon.sh"
+fi
+```
+
+## Hook Matchers
+
+Gemini CLI uses matchers to filter when hooks fire:
+
+- `startup` — Only fires on Gemini CLI startup
+- `*` — Fires for all events
+- Custom patterns — Match specific tools or contexts
+
+Example: Only play sounds for bash tools:
+
+```json
+{
+  "AfterTool": [
+    {
+      "matcher": "bash",
+      "hooks": [
+        {
+          "name": "peon-after-tool",
+          "type": "command",
+          "command": "bash ~/.claude/hooks/peon-ping/adapters/gemini.sh AfterTool"
+        }
+      ]
+    }
+  ]
+}
+```
+
+## Configuration
+
+Gemini CLI shares the global PeonPing config:
+
+- Config: `~/.claude/hooks/peon-ping/config.json`
+- Packs: `~/.claude/hooks/peon-ping/packs/`
+
+See [Configuration](/configuration/overview) for all options.
+
+## Return Value
+
+Gemini CLI hooks must return valid JSON. The adapter always returns `{}` to avoid breaking the hook chain:
+
+```bash
+# Always return valid empty JSON to Gemini CLI
+echo "{}"
+```
+
+## Limitations
+
+- **No session end event** — Gemini CLI doesn't expose a session end hook
+- **No permission prompt detection** — Tool approval events aren't exposed
+- **AfterTool fires for all tools** — You might want to disable `task.complete` sounds if you use many tools:
+
+  ```json
+  {
+    "categories": {
+      "task.complete": false
+    }
+  }
+  ```

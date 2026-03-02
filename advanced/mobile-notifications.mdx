@@ -1,0 +1,222 @@
+---
+title: Mobile Notifications
+description: Get push notifications on your phone via ntfy, Pushover, or Telegram
+---
+
+Get push notifications on your phone when AI tasks finish or need attention — useful when you're away from your desk.
+
+## Quick start (ntfy.sh — free)
+
+**ntfy.sh** is the recommended option. No account required, fully open source.
+
+<Steps>
+  <Step title="Install the ntfy app">
+    Download from [ntfy.sh](https://ntfy.sh):
+    - iOS: [App Store](https://apps.apple.com/us/app/ntfy/id1625396347)
+    - Android: [Google Play](https://play.google.com/store/apps/details?id=io.heckel.ntfy) or [F-Droid](https://f-droid.org/en/packages/io.heckel.ntfy/)
+  </Step>
+
+  <Step title="Subscribe to a unique topic">
+    Open the app and subscribe to a topic like `my-peon-notifications` or `alice-coding-alerts`.
+    
+    <Note>
+      Topics are public by default. Use a random/unique name to avoid collisions (e.g., `peon-a8f3d9c2`).
+    </Note>
+  </Step>
+
+  <Step title="Configure PeonPing">
+    ```bash
+    peon mobile ntfy my-peon-notifications
+    ```
+    
+    This enables mobile notifications and sets the topic.
+  </Step>
+
+  <Step title="Test it">
+    ```bash
+    peon mobile test
+    ```
+    
+    You should receive a test notification on your phone.
+  </Step>
+</Steps>
+
+## Pushover setup
+
+[Pushover](https://pushover.net) is a paid service ($5 one-time) with richer notification features.
+
+<Steps>
+  <Step title="Create a Pushover account">
+    Sign up at [pushover.net](https://pushover.net) and install the app.
+  </Step>
+
+  <Step title="Register an application">
+    1. Go to [pushover.net/apps/build](https://pushover.net/apps/build)
+    2. Create an app named "PeonPing"
+    3. Copy the **API Token**
+  </Step>
+
+  <Step title="Get your User Key">
+    Find it on your [Pushover dashboard](https://pushover.net).
+  </Step>
+
+  <Step title="Configure PeonPing">
+    ```bash
+    peon mobile pushover <user_key> <app_token>
+    ```
+  </Step>
+
+  <Step title="Test it">
+    ```bash
+    peon mobile test
+    ```
+  </Step>
+</Steps>
+
+## Telegram setup
+
+<Steps>
+  <Step title="Create a bot">
+    1. Message [@BotFather](https://t.me/botfather) on Telegram
+    2. Send `/newbot` and follow the prompts
+    3. Copy the **bot token** (looks like `110201543:AAHdqTcvCH1vGWJxfSeofSAs0K5PALDsaw`)
+  </Step>
+
+  <Step title="Get your chat ID">
+    1. Message your bot (send any text)
+    2. Visit: `https://api.telegram.org/bot<YOUR_BOT_TOKEN>/getUpdates`
+    3. Find `"chat":{"id":123456789}` in the response
+  </Step>
+
+  <Step title="Configure PeonPing">
+    ```bash
+    peon mobile telegram <bot_token> <chat_id>
+    ```
+  </Step>
+
+  <Step title="Test it">
+    ```bash
+    peon mobile test
+    ```
+  </Step>
+</Steps>
+
+## Mobile commands
+
+| Command | Description |
+|---------|-------------|
+| `peon mobile ntfy <topic>` | Enable ntfy notifications |
+| `peon mobile pushover <user> <token>` | Enable Pushover |
+| `peon mobile telegram <token> <chat_id>` | Enable Telegram |
+| `peon mobile on` | Enable mobile notifications |
+| `peon mobile off` | Disable mobile notifications |
+| `peon mobile status` | Show current config |
+| `peon mobile test` | Send a test notification |
+
+## Event mapping
+
+Mobile notifications fire on these events:
+
+| Event | Notification |
+|-------|-------------|
+| Task completes | "Project: task complete" |
+| Permission needed | "Project: approval required" |
+| Error occurs | "Project: error" |
+| Rate limit hit | "Project: rate limit" |
+
+<Note>
+  Session start and spam events do NOT trigger mobile notifications.
+</Note>
+
+## Independent controls
+
+Mobile notifications work independently from desktop notifications and sounds:
+
+| Config Key | Controls | Affects Sounds | Affects Desktop | Affects Mobile |
+|------------|----------|----------------|-----------------|----------------|
+| `enabled` | Master audio switch | ✅ Yes | ❌ No | ❌ No |
+| `desktop_notifications` | Desktop popups | ❌ No | ✅ Yes | ❌ No |
+| `mobile_notify.enabled` | Phone push | ❌ No | ❌ No | ✅ Yes |
+
+This means you can:
+- Keep sounds but disable desktop popups: `peon notifications off`
+- Keep desktop popups but disable sounds: `peon pause`
+- **Enable mobile push without desktop popups**: set `desktop_notifications: false` and `mobile_notify.enabled: true`
+
+## Configuration
+
+Mobile settings live in `config.json`:
+
+```json
+{
+  "mobile_notify": {
+    "enabled": true,
+    "service": "ntfy",
+    "ntfy_topic": "my-peon-notifications",
+    "pushover_user_key": "",
+    "pushover_app_token": "",
+    "telegram_bot_token": "",
+    "telegram_chat_id": ""
+  }
+}
+```
+
+<Warning>
+  Never commit `config.json` to version control if it contains API tokens.
+</Warning>
+
+## Privacy & security
+
+### ntfy
+
+- Messages are **not encrypted** by default
+- Anyone who knows your topic can subscribe to it
+- Use a random topic name: `peon mobile ntfy peon-$(uuidgen | head -c 8)`
+- For better privacy, [self-host ntfy](https://docs.ntfy.sh/install/) or use [access control](https://docs.ntfy.sh/publish/#access-tokens)
+
+### Pushover
+
+- Messages are encrypted in transit (HTTPS)
+- Pushover stores messages on their servers (see [privacy policy](https://pushover.net/privacy))
+
+### Telegram
+
+- Bot API uses HTTPS
+- Messages are stored on Telegram servers
+- Bots can't initiate conversations — you must message the bot first
+
+## Troubleshooting
+
+### No notifications received (ntfy)
+
+1. Check the topic name: `peon mobile status`
+2. Test manually: `curl -d "Test" ntfy.sh/YOUR_TOPIC`
+3. Verify app is subscribed to the correct topic
+4. Check app notification permissions
+
+### No notifications received (Pushover)
+
+1. Verify keys: `peon mobile status`
+2. Test the API manually:
+   ```bash
+   curl -X POST https://api.pushover.net/1/messages.json \
+     -d "token=YOUR_APP_TOKEN" \
+     -d "user=YOUR_USER_KEY" \
+     -d "message=Test"
+   ```
+3. Check monthly quota (7,500 messages/month on free tier)
+
+### No notifications received (Telegram)
+
+1. Verify bot token and chat ID: `peon mobile status`
+2. Test manually:
+   ```bash
+   curl -X POST "https://api.telegram.org/bot<TOKEN>/sendMessage" \
+     -d "chat_id=<CHAT_ID>" \
+     -d "text=Test"
+   ```
+3. Make sure you've sent at least one message to the bot
+
+## Advanced: Custom notification server
+
+You can point PeonPing to your own notification endpoint by editing the notification logic in `peon.sh` (around line 800+). Look for the `send_mobile_notification` function.

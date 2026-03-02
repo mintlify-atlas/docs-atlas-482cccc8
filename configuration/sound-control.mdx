@@ -1,0 +1,253 @@
+---
+title: Sound Control
+description: Configure audio playback including volume, enable/disable state, headphones-only mode, and meeting detection.
+---
+
+Sound control settings manage when and how PeonPing plays audio.
+
+## Master Volume
+
+<ParamField path="volume" type="number" default="0.5">
+  Master volume for all sound playback. Range: `0.0` (silent) to `1.0` (full volume).
+  
+  Quiet enough for the office at `0.3`–`0.5`.
+</ParamField>
+
+**CLI commands:**
+
+```bash
+peon volume           # Show current volume
+peon volume 0.7       # Set to 70%
+peon volume 0.3       # Set to 30% (office-friendly)
+```
+
+**Example:**
+
+```json
+{
+  "volume": 0.5
+}
+```
+
+## Enable/Disable Audio
+
+<ParamField path="enabled" type="boolean" default="true">
+  Master switch for all audio playback.
+  
+  When `false`, sounds are muted but desktop and mobile notifications continue working (they have independent controls).
+</ParamField>
+
+**CLI commands:**
+
+```bash
+peon pause            # Mute sounds
+peon resume           # Unmute sounds
+peon toggle           # Toggle mute state
+peon mute             # Alias for 'pause'
+peon unmute           # Alias for 'resume'
+peon status           # Check current state
+```
+
+**Example:**
+
+```json
+{
+  "enabled": false
+}
+```
+
+<Note>
+The `enabled` setting only affects **sounds**. Desktop notifications and mobile push notifications have separate toggles (`desktop_notifications` and `mobile_notify.enabled`).
+</Note>
+
+## Headphones-Only Mode
+
+<ParamField path="headphones_only" type="boolean" default="false">
+  Only play sounds when headphones or external audio devices are detected.
+  
+  When enabled, sounds are suppressed if built-in speakers are the active output. Useful for open offices or shared spaces.
+  
+  **Supported platforms:**
+  - macOS (via `system_profiler`)
+  - Linux (via PipeWire `wpctl` or PulseAudio `pactl`)
+  - WSL2 (via PowerShell device enumeration)
+</ParamField>
+
+**CLI commands:**
+
+```bash
+peon status           # Shows headphone detection status
+```
+
+**Example:**
+
+```json
+{
+  "headphones_only": true
+}
+```
+
+**Output when checking status:**
+
+```
+peon-ping: headphones_only: on
+peon-ping: headphones: connected
+```
+
+or if built-in speakers are active:
+
+```
+peon-ping: headphones_only: on
+peon-ping: headphones: not detected (sounds muted)
+```
+
+<Tip>
+Headphones-only mode detects:
+- Wired headphones
+- Bluetooth headphones/headsets
+- External speakers
+- USB audio interfaces
+
+It suppresses sounds only when the **built-in speakers** are the active output device.
+</Tip>
+
+## Meeting Detection
+
+<ParamField path="meeting_detect" type="boolean" default="false">
+  Automatically suppress audio when the microphone is in use (indicating an active call or meeting).
+  
+  When enabled, PeonPing detects if the microphone is being used and temporarily mutes sounds until the mic is no longer active. **Notifications still appear.**
+  
+  **Supported platforms:**
+  - macOS (via CoreAudio mic usage detection)
+  - Linux (via PipeWire/PulseAudio source monitoring)
+</ParamField>
+
+**Example:**
+
+```json
+{
+  "meeting_detect": true
+}
+```
+
+<Warning>
+Meeting detection is **not** available on Windows or WSL2 environments. The feature requires native OS-level microphone usage APIs.
+</Warning>
+
+## Suppress Sound When Tab Focused
+
+<ParamField path="suppress_sound_when_tab_focused" type="boolean" default="false">
+  Skip sound playback when the terminal tab that generated the hook event is currently active/focused.
+  
+  Sounds still play for background tabs as an alert. Desktop and mobile notifications are unaffected.
+  
+  Useful when you only want audio cues from tabs you're **not** watching.
+  
+  **macOS only** (uses AppleScript to check frontmost app and iTerm2 tab focus).
+</ParamField>
+
+**Example:**
+
+```json
+{
+  "suppress_sound_when_tab_focused": true
+}
+```
+
+## Linux Audio Player
+
+<ParamField path="linux_audio_player" type="string" default="">
+  Override the default audio backend detection on Linux.
+  
+  By default, PeonPing auto-detects the first available player in this priority order:
+  1. `pw-play` (PipeWire)
+  2. `paplay` (PulseAudio)
+  3. `ffplay` (FFmpeg)
+  4. `mpv`
+  5. `play` (SoX)
+  6. `aplay` (ALSA)
+  
+  Set this to force a specific backend (e.g., `"mpv"` or `"ffplay"`).
+</ParamField>
+
+**Example:**
+
+```json
+{
+  "linux_audio_player": "mpv"
+}
+```
+
+## macOS Sound Effects Device
+
+<ParamField path="use_sound_effects_device" type="boolean" default="true">
+  On macOS, use the system's "Sound Effects" output device instead of the default audio output.
+  
+  This respects macOS System Settings → Sound → Sound Effects output device selection, allowing you to route PeonPing sounds to a different device than your music/videos.
+  
+  When `false`, sounds play through the default audio output (same as music).
+  
+  **macOS only.**
+</ParamField>
+
+**Example:**
+
+```json
+{
+  "use_sound_effects_device": false
+}
+```
+
+## Independent Controls
+
+PeonPing has three independent switches that can be mixed and matched:
+
+| Config Key | Controls | Affects Sounds | Affects Desktop | Affects Mobile |
+|------------|----------|----------------|-----------------|----------------|
+| `enabled` | Master audio switch | ✅ Yes | ❌ No | ❌ No |
+| `desktop_notifications` | Desktop popup banners | ❌ No | ✅ Yes | ❌ No |
+| `mobile_notify.enabled` | Phone push notifications | ❌ No | ❌ No | ✅ Yes |
+
+### Common Scenarios
+
+**Sounds without popups:**
+
+```json
+{
+  "enabled": true,
+  "desktop_notifications": false
+}
+```
+
+```bash
+peon notifications off
+```
+
+**Silent mode with notifications only:**
+
+```json
+{
+  "enabled": false,
+  "desktop_notifications": true
+}
+```
+
+```bash
+peon pause
+```
+
+**Complete silence:**
+
+```json
+{
+  "enabled": false,
+  "desktop_notifications": false
+}
+```
+
+```bash
+peon pause
+peon notifications off
+peon mobile off
+```

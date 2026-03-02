@@ -1,0 +1,156 @@
+---
+title: 'Claude Code'
+description: 'Built-in PeonPing support via hook registration in settings.json'
+---
+
+Claude Code has native PeonPing support through its hook system. The installer automatically registers hooks in `~/.claude/settings.json`.
+
+## Installation
+
+The installer handles everything:
+
+```bash
+curl -fsSL https://raw.githubusercontent.com/PeonPing/peon-ping/main/install.sh | bash
+```
+
+Or via Homebrew:
+
+```bash
+brew install PeonPing/tap/peon-ping
+peon-ping-setup
+```
+
+## How It Works
+
+Claude Code fires hook events at key points during agent sessions. PeonPing registers `peon.sh` as a handler for:
+
+- `SessionStart` — Agent session begins
+- `Stop` — Agent completes a task
+- `PermissionRequest` — Tool needs approval
+- `PostToolUseFailure` — Tool execution fails
+- `SubagentStart` — Subagent (Task tool) spawns
+- `PreCompact` — Context compaction (token limit)
+
+### Hook Registration
+
+The installer writes to `~/.claude/settings.json`:
+
+```json
+{
+  "hooks": {
+    "SessionStart": [
+      {
+        "command": "bash ~/.claude/hooks/peon-ping/peon.sh"
+      }
+    ],
+    "Stop": [
+      {
+        "command": "bash ~/.claude/hooks/peon-ping/peon.sh"
+      }
+    ],
+    "PermissionRequest": [
+      {
+        "command": "bash ~/.claude/hooks/peon-ping/peon.sh"
+      }
+    ],
+    "PostToolUseFailure": [
+      {
+        "command": "bash ~/.claude/hooks/peon-ping/peon.sh"
+      }
+    ],
+    "SubagentStart": [
+      {
+        "command": "bash ~/.claude/hooks/peon-ping/peon.sh"
+      }
+    ],
+    "PreCompact": [
+      {
+        "command": "bash ~/.claude/hooks/peon-ping/peon.sh"
+      }
+    ]
+  }
+}
+```
+
+Claude Code pipes JSON context to stdin:
+
+```json
+{
+  "hook_event_name": "Stop",
+  "notification_type": "",
+  "cwd": "/Users/dev/project",
+  "session_id": "abc123",
+  "permission_mode": ""
+}
+```
+
+## Event Mapping
+
+| Claude Code Event | CESP Category | Sound Examples |
+|-------------------|---------------|----------------|
+| `SessionStart` | `session.start` | "Ready to work?", "Yes?" |
+| `Stop` | `task.complete` | "Work, work.", "Job's done!" |
+| `PermissionRequest` | `input.required` | "Something need doing?", "Hmm?" |
+| `PostToolUseFailure` | `task.error` | "I can't do that.", "Son of a bitch!" |
+| `PreCompact` | `resource.limit` | "Zug zug." (pack dependent) |
+| Rapid prompts (3+ in 10s) | `user.spam` | "Me busy, leave me alone!" |
+
+## Slash Commands
+
+PeonPing includes two slash commands for Claude Code:
+
+<Accordion title="/peon-ping-toggle">
+  Mute/unmute sounds and notifications instantly. Persists across sessions.
+  
+  ```bash
+  /peon-ping-toggle
+  ```
+</Accordion>
+
+<Accordion title="/peon-ping-config">
+  Modify any setting (volume, packs, categories, etc.) without editing config files.
+  
+  ```bash
+  /peon-ping-config
+  ```
+  
+  Or just ask Claude to change settings:
+  - "Set volume to 0.3"
+  - "Enable round-robin pack rotation"
+  - "Add glados to my pack rotation"
+</Accordion>
+
+## Local vs Global Install
+
+**Global install** (default)
+
+Hooks registered in `~/.claude/settings.json`, packs in `~/.claude/hooks/peon-ping/packs/`. Works across all projects.
+
+**Local install**
+
+Packs and config in `./.claude/hooks/peon-ping/`, but hooks are still global (with absolute paths). Useful for per-project pack bindings.
+
+```bash
+curl -fsSL https://raw.githubusercontent.com/PeonPing/peon-ping/main/install.sh | bash -s -- --local
+```
+
+## Configuration
+
+Config location:
+
+- Global: `~/.claude/hooks/peon-ping/config.json`
+- Local: `./.claude/hooks/peon-ping/config.json`
+
+See [Configuration](/configuration/overview) for all available options.
+
+## Subagent Filtering
+
+Claude Code's Task tool spawns parallel subagents. By default, each subagent completion plays a sound. To only hear the parent session's completion:
+
+```json
+{
+  "suppress_subagent_complete": true
+}
+```
+
+Add to `config.json` or use the `/peon-ping-config` slash command.

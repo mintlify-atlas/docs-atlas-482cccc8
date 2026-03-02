@@ -1,0 +1,360 @@
+---
+title: Custom Sound Packs
+description: Create and share your own sound packs using the CESP manifest format
+---
+
+PeonPing uses the [Coding Event Sound Pack (CESP)](https://github.com/PeonPing/openpeon) specification — an open standard that any agentic IDE can adopt. You can create custom packs with your favorite game characters, movie quotes, or even your own voice.
+
+## Pack structure
+
+A sound pack is a directory with audio files and a manifest:
+
+```
+my-pack/
+  openpeon.json        # CESP manifest (required)
+  sounds/              # Audio files
+    Hello.wav
+    Done.mp3
+    Error.ogg
+    ...
+  README.md            # Description (recommended)
+  LICENSE              # License (recommended)
+```
+
+**Supported formats:** WAV, MP3, OGG, FLAC, AAC, M4A, OPUS
+
+**Size limits:**
+- Max 1 MB per file
+- Max 50 MB total per pack
+
+<Note>
+  Keep files small — game sound effects are ideal. Long audio files waste bandwidth and slow down playback.
+</Note>
+
+## CESP manifest format
+
+The `openpeon.json` file maps your sounds to CESP event categories:
+
+```json openpeon.json
+{
+  "cesp_version": "1.0",
+  "name": "my_pack",
+  "display_name": "My Character",
+  "version": "1.0.0",
+  "author": {
+    "name": "Your Name",
+    "github": "yourname"
+  },
+  "license": "CC-BY-NC-4.0",
+  "language": "en",
+  "categories": {
+    "session.start": {
+      "sounds": [
+        { "file": "sounds/Hello.wav", "label": "Hello there" },
+        { "file": "sounds/Ready.wav", "label": "Ready to work?" }
+      ]
+    },
+    "task.complete": {
+      "sounds": [
+        { "file": "sounds/Done.mp3", "label": "Done" },
+        { "file": "sounds/Finished.mp3", "label": "All finished" }
+      ]
+    },
+    "task.error": {
+      "sounds": [
+        { "file": "sounds/Error.ogg", "label": "Oops" }
+      ]
+    },
+    "input.required": {
+      "sounds": [
+        { "file": "sounds/NeedHelp.wav", "label": "Need your help" }
+      ]
+    }
+  }
+}
+```
+
+### Required fields
+
+| Field | Type | Description |
+|-------|------|-------------|
+| `cesp_version` | string | CESP spec version (use `"1.0"`) |
+| `name` | string | Pack ID (lowercase, no spaces, use underscores) |
+| `display_name` | string | Human-readable name |
+| `version` | string | Semver (e.g., `"1.0.0"`) |
+| `categories` | object | Sound mappings (see below) |
+
+### Optional fields
+
+| Field | Type | Description |
+|-------|------|-------------|
+| `author` | object | `{ "name": "...", "github": "..." }` |
+| `license` | string | License (e.g., `"CC-BY-NC-4.0"`, `"MIT"`) |
+| `language` | string | Language code (e.g., `"en"`, `"zh"`, `"ja"`) |
+| `description` | string | Short description |
+| `tags` | array | Tags like `["game", "sci-fi"]` |
+
+## CESP categories
+
+Map your sounds to these event categories:
+
+| Category | When it plays | Required? |
+|----------|---------------|----------|
+| `session.start` | Session starts | ✅ Recommended |
+| `task.acknowledge` | Agent acknowledges task | ❌ Optional |
+| `task.complete` | Agent finishes and waits | ✅ Recommended |
+| `task.error` | Error or failure | ✅ Recommended |
+| `input.required` | Permission needed | ✅ Recommended |
+| `resource.limit` | Rate/token limit hit | ❌ Optional |
+| `user.spam` | Rapid prompts (3+ in 10s) | ❌ Optional |
+| `session.end` | Session ends | ❌ Optional (not yet triggered) |
+| `task.progress` | Progress update | ❌ Optional (not yet triggered) |
+
+<Warning>
+  Not every category is required. Include only the ones you have sounds for. At minimum, provide `session.start`, `task.complete`, `task.error`, and `input.required`.
+</Warning>
+
+## Sound entries
+
+Each category contains an array of sound objects:
+
+```json
+{
+  "file": "sounds/Hello.wav",
+  "label": "Hello there"
+}
+```
+
+| Field | Type | Description |
+|-------|------|-------------|
+| `file` | string | Path relative to pack root (e.g., `"sounds/Hello.wav"`) |
+| `label` | string | Human-readable description (shown in previews) |
+
+**Multiple sounds per category** are supported — PeonPing picks one randomly each time, avoiding repeats.
+
+## Install a local pack
+
+<Steps>
+  <Step title="Create your pack directory">
+    ```bash
+    mkdir -p ~/my-peon-pack/sounds
+    ```
+  </Step>
+
+  <Step title="Add audio files">
+    ```bash
+    cp ~/Downloads/hello.wav ~/my-peon-pack/sounds/
+    cp ~/Downloads/done.mp3 ~/my-peon-pack/sounds/
+    ```
+  </Step>
+
+  <Step title="Create openpeon.json">
+    Use the template above and save it as `~/my-peon-pack/openpeon.json`.
+  </Step>
+
+  <Step title="Install the pack">
+    ```bash
+    peon packs install-local ~/my-peon-pack
+    ```
+    
+    This copies the pack to `~/.openpeon/packs/my_pack/`.
+  </Step>
+
+  <Step title="Activate the pack">
+    ```bash
+    peon packs use my_pack
+    ```
+  </Step>
+
+  <Step title="Test it">
+    ```bash
+    peon preview session.start
+    ```
+    
+    You should hear your custom greeting sounds.
+  </Step>
+</Steps>
+
+## Share your pack
+
+To make your pack available to everyone:
+
+<Steps>
+  <Step title="Create a GitHub repo">
+    ```bash
+    cd ~/my-peon-pack
+    git init
+    git add .
+    git commit -m "Initial pack"
+    gh repo create yourname/openpeon-mypack --public --source=. --push
+    ```
+  </Step>
+
+  <Step title="Tag a release">
+    ```bash
+    git tag v1.0.0
+    git push origin v1.0.0
+    ```
+  </Step>
+
+  <Step title="Register in the OpenPeon registry">
+    1. Fork [PeonPing/registry](https://github.com/PeonPing/registry)
+    2. Add your pack to `index.json` (keep alphabetical order):
+    
+    ```json
+    {
+      "name": "my_pack",
+      "display_name": "My Character",
+      "author": "yourname",
+      "source_repo": "yourname/openpeon-mypack",
+      "source_ref": "v1.0.0",
+      "source_path": "",
+      "tags": ["custom", "game"]
+    }
+    ```
+    
+    3. Open a pull request
+  </Step>
+
+  <Step title="Wait for merge">
+    Once merged, your pack will be installable:
+    
+    ```bash
+    peon packs install my_pack
+    ```
+    
+    And listed on [openpeon.com/packs](https://openpeon.com/packs).
+  </Step>
+</Steps>
+
+## Automate pack creation
+
+If you have a single audio file with all quotes, you can auto-transcribe and split it:
+
+<Steps>
+  <Step title="Transcribe with timestamps">
+    Option A: Deepgram (cloud, fast)
+    
+    ```bash
+    curl --http1.1 -X POST \
+      "https://api.deepgram.com/v1/listen?model=nova-2&smart_format=true&utterances=true&utt_split=0.8" \
+      -H "Authorization: Token $DEEPGRAM_API_KEY" \
+      -H "Content-Type: audio/mpeg" \
+      --data-binary @your_audio.mp3 -o transcription.json
+    ```
+    
+    Option B: Whisper (local, free)
+    
+    ```bash
+    pip install openai-whisper
+    whisper your_audio.mp3 --model base --language en \
+      --output_format json --word_timestamps True --output_dir .
+    ```
+  </Step>
+
+  <Step title="Extract timestamps from JSON">
+    Look for `"utterances"` (Deepgram) or `"segments"` (Whisper) with `start` and `end` times.
+  </Step>
+
+  <Step title="Cut individual clips with ffmpeg">
+    ```bash
+    ffmpeg -i your_audio.mp3 -ss 0.0 -to 1.5 -c copy sounds/Quote1.mp3
+    ffmpeg -i your_audio.mp3 -ss 2.0 -to 4.8 -c copy sounds/Quote2.mp3
+    # Repeat for each quote
+    ```
+  </Step>
+
+  <Step title="Map clips to categories">
+    Update `openpeon.json` with your sound files and labels.
+  </Step>
+</Steps>
+
+## Licensing
+
+Sound packs often contain copyrighted audio. Here's how official packs handle this:
+
+- **Fair use** — Personal notification sounds are generally considered fair use
+- **Non-commercial** — Most packs use CC-BY-NC licenses (no commercial use)
+- **Attribution** — Always credit the original source in your README
+
+<Warning>
+  Do NOT sell packs containing copyrighted audio. Keep them free and credit the original creators.
+</Warning>
+
+Recommended licenses:
+- `CC-BY-NC-4.0` — Attribution, non-commercial
+- `MIT` — For original recordings
+- `CC0` — Public domain
+
+## Pack validation
+
+Before publishing, validate your pack:
+
+```bash
+peon packs install-local ~/my-peon-pack
+peon packs use my_pack
+peon preview  # Test all categories
+```
+
+Check for:
+- ✅ All audio files exist and play correctly
+- ✅ Manifest is valid JSON
+- ✅ File paths are correct (relative to pack root)
+- ✅ No missing categories (at least 4 recommended ones)
+- ✅ Pack size under 50 MB
+
+## Advanced: File paths
+
+By default, sounds are in `sounds/` subdirectory:
+
+```json
+{ "file": "sounds/Hello.wav" }
+```
+
+You can also use pack-root-relative paths:
+
+```json
+{ "file": "audio/greetings/Hello.wav" }
+```
+
+Or organize by category:
+
+```
+my-pack/
+  openpeon.json
+  session/
+    start1.wav
+    start2.wav
+  task/
+    complete1.wav
+    error1.wav
+```
+
+```json
+{
+  "categories": {
+    "session.start": {
+      "sounds": [
+        { "file": "session/start1.wav", "label": "Hello" }
+      ]
+    },
+    "task.complete": {
+      "sounds": [
+        { "file": "task/complete1.wav", "label": "Done" }
+      ]
+    }
+  }
+}
+```
+
+<Warning>
+  Path traversal is blocked. Files must be within the pack directory.
+</Warning>
+
+## Resources
+
+- [CESP Specification](https://github.com/PeonPing/openpeon)
+- [OpenPeon Registry](https://github.com/PeonPing/registry)
+- [Pack Browser](https://openpeon.com/packs)
+- [Official Packs](https://github.com/PeonPing/og-packs)
+- [Creation Guide](https://openpeon.com/create)

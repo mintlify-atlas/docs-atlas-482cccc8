@@ -1,0 +1,260 @@
+---
+title: MCP Server
+description: Let AI agents choose their own sounds via Model Context Protocol
+---
+
+PeonPing includes an [MCP (Model Context Protocol)](https://modelcontextprotocol.io/) server so any MCP-compatible AI agent can play sounds directly via tool calls — no hooks required.
+
+## Key difference
+
+**The agent chooses the sound.** Instead of automatically playing a fixed sound on every event, the agent calls `play_sound` with exactly what it wants:
+
+- `duke_nukem/SonOfABitch` when a build fails
+- `sc_kerrigan/IReadYou` when reading files
+- `glados/YourEntireTeamIsDead` when tests fail
+
+This gives the agent full creative control over audio feedback.
+
+## Requirements
+
+- Node.js 18+
+- PeonPing installed (macOS, Linux, or WSL2)
+
+## Setup
+
+<Steps>
+  <Step title="Install PeonPing">
+    ```bash
+    curl -fsSL https://peonping.com/install | bash
+    ```
+  </Step>
+
+  <Step title="Install MCP dependencies">
+    ```bash
+    cd ~/.claude/hooks/peon-ping/mcp
+    npm install
+    ```
+    
+    <Note>
+      If installed via Homebrew, the MCP server is at `$(brew --prefix peon-ping)/libexec/mcp/`.
+    </Note>
+  </Step>
+
+  <Step title="Add to your MCP client config">
+    Choose your client:
+    
+    ### Claude Desktop
+    
+    Edit `~/Library/Application Support/Claude/claude_desktop_config.json`:
+    
+    ```json
+    {
+      "mcpServers": {
+        "peon-ping": {
+          "command": "node",
+          "args": ["/path/to/peon-ping/mcp/peon-mcp.js"]
+        }
+      }
+    }
+    ```
+    
+    ### Cursor
+    
+    Edit `.cursor/mcp.json`:
+    
+    ```json
+    {
+      "mcpServers": {
+        "peon-ping": {
+          "command": "node",
+          "args": ["/path/to/peon-ping/mcp/peon-mcp.js"]
+        }
+      }
+    }
+    ```
+    
+    ### Any MCP client
+    
+    ```json
+    {
+      "command": "node",
+      "args": ["/path/to/peon-ping/mcp/peon-mcp.js"],
+      "env": { "PEON_VOLUME": "0.5" }
+    }
+    ```
+  </Step>
+
+  <Step title="Restart your MCP client">
+    Restart Claude Desktop, Cursor, or your MCP client to load the server.
+  </Step>
+</Steps>
+
+## MCP features
+
+### Tool: play_sound
+
+Play one or more sound effects.
+
+**Parameters:**
+- `sound` (string, optional) — Single sound key like `"peon/PeonReady1"`
+- `sounds` (array, optional) — Multiple sound keys like `["peon/WorkWork", "peon/JobsDone"]`
+
+**Examples:**
+
+```json
+// Play one sound
+{
+  "sound": "duke_nukem/Groovy"
+}
+
+// Play multiple sounds
+{
+  "sounds": ["glados/OhItsYou", "glados/Wonderful"]
+}
+```
+
+The agent can call this tool whenever it wants audio feedback.
+
+### Resource: peon-ping://catalog
+
+Full pack catalog — all packs and sounds. The client reads this once, giving the model full context without repeated tool calls.
+
+**Example output:**
+
+```
+75 packs. Use play_sound with "pack/SoundName".
+
+duke_nukem (Duke Nukem): duke_nukem/Groovy ("Groovy"), duke_nukem/SonOfABitch ("Son of a bitch!"), ...
+glados (GLaDOS): glados/OhItsYou ("Oh, it's you."), glados/YourEntireTeamIsDead ("Your entire team is dead."), ...
+peon (Orc Peon): peon/PeonReady1 ("Ready to work?"), peon/WorkWork ("Work, work."), ...
+```
+
+### Resource: peon-ping://pack/{name}
+
+Sounds in a specific pack, grouped by category.
+
+**Example: peon-ping://pack/peon**
+
+```
+Orc Peon:
+session.start:
+  peon/PeonReady1 — "Ready to work?"
+  peon/PeonReady2 — "Yes?"
+task.complete:
+  peon/WorkWork — "Work, work."
+  peon/JobsDone — "Job's done!"
+input.required:
+  peon/SomethingNeedDoing — "Something need doing?"
+```
+
+## Environment variables
+
+| Variable | Default | Description |
+|----------|---------|-------------|
+| `PEON_PACKS_DIR` | `~/.openpeon/packs` | Sound packs directory |
+| `PEON_VOLUME` | `0.5` | Playback volume (0-1) |
+
+Set these when configuring the MCP server:
+
+```json
+{
+  "command": "node",
+  "args": ["/path/to/peon-mcp.js"],
+  "env": {
+    "PEON_VOLUME": "0.8",
+    "PEON_PACKS_DIR": "/custom/path/to/packs"
+  }
+}
+```
+
+## Platform support
+
+| Platform | Audio Backend |
+|----------|---------------|
+| macOS | `afplay` or `peon-play` (Sound Effects device) |
+| Linux | `pw-play`, `paplay`, `ffplay`, `mpv`, `play`, `aplay` (first available) |
+| WSL2 | PowerShell `SoundPlayer` |
+
+<Warning>
+  Windows native support is not yet available. Use WSL2 instead.
+</Warning>
+
+## How it works
+
+1. **Client starts** → MCP server loads pack catalog from `~/.openpeon/packs/`
+2. **Client reads resources** → Model gets full sound catalog via `peon-ping://catalog`
+3. **Agent wants audio** → Calls `play_sound` with sound keys
+4. **Server plays audio** → Resolves pack/sound keys to file paths, queues playback
+5. **Audio plays** → Native audio backend plays the file asynchronously
+
+## Example agent prompt
+
+```
+You have access to game sound effects via the peon-ping MCP server.
+Use play_sound when:
+- A task completes successfully (e.g., "glados/OhGood")
+- An error occurs (e.g., "duke_nukem/SonOfABitch")
+- You're reading files (e.g., "sc_kerrigan/IReadYou")
+- A build finishes (e.g., "peon/WorkWork")
+
+Browse the catalog resource to see all available sounds.
+Be creative and match sounds to context.
+```
+
+## Debugging
+
+### Check if the server is loaded
+
+In Claude Desktop, check the MCP status icon. In Cursor, check `.cursor/logs/`.
+
+### Test manually
+
+Run the MCP server directly:
+
+```bash
+node /path/to/peon-mcp.js
+```
+
+It should start without errors. Press Ctrl+C to stop.
+
+### Verify packs are found
+
+```bash
+ls ~/.openpeon/packs/
+# Should list: peon, glados, sc_kerrigan, etc.
+```
+
+### Check Node.js version
+
+```bash
+node --version
+# Should be v18.0.0 or higher
+```
+
+## Architecture
+
+The MCP server (`peon-mcp.js`) is a standalone Node.js script that:
+
+1. **Loads config** — Reads `~/.claude/hooks/peon-ping/config.json` for volume
+2. **Scans packs** — Reads `openpeon.json` manifests from `~/.openpeon/packs/`
+3. **Exposes resources** — Serves catalog and pack details via MCP Resources
+4. **Handles tool calls** — Resolves sound keys to file paths, validates, and queues playback
+5. **Plays audio** — Spawns native audio players (afplay, pw-play, etc.) asynchronously
+
+**No state is shared** with the hook-based PeonPing installation. The MCP server is completely independent.
+
+## Limitations
+
+- **No desktop notifications** — Only audio playback
+- **No mobile notifications** — MCP server is client-side only
+- **No relay support** — SSH/devcontainer routing not implemented
+- **Max 5 sounds per call** — Prevents abuse
+
+## Contributing
+
+The MCP server was contributed by [@tag-assistant](https://github.com/tag-assistant). To add features:
+
+1. Fork [PeonPing/peon-ping](https://github.com/PeonPing/peon-ping)
+2. Edit `mcp/peon-mcp.js`
+3. Test with `node mcp/peon-mcp.js`
+4. Submit a PR

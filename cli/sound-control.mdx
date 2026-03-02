@@ -1,0 +1,220 @@
+---
+title: "Sound Control"
+description: "Commands for toggling, pausing, adjusting volume, and previewing sounds"
+---
+
+## toggle
+
+Toggle sounds on/off. The opposite of the current state.
+
+```bash
+peon toggle
+```
+
+**Output:**
+```
+peon-ping: sounds resumed
+```
+
+**Output (when paused):**
+```
+peon-ping: sounds paused (run 'peon toggle' to unpause)
+```
+
+**Behavior:**
+- Creates `.paused` marker file when pausing
+- Removes `.paused` marker file when resuming
+- State persists across sessions
+- Desktop notifications continue when paused (controlled separately via `peon notifications off`)
+
+## pause / mute
+
+Mute all sounds. Alias: `mute`.
+
+```bash
+peon pause
+peon mute    # Same as pause
+```
+
+**Output:**
+```
+peon-ping: sounds paused (run 'peon toggle' to unpause)
+```
+
+**What Gets Muted:**
+- Voice lines for all CESP categories
+- Audio playback during hook events
+
+**What Continues:**
+- Desktop notifications (controlled by `desktop_notifications` config key)
+- Mobile push notifications
+- Terminal tab title updates
+
+## resume / unmute
+
+Unmute sounds. Alias: `unmute`.
+
+```bash
+peon resume
+peon unmute  # Same as resume
+```
+
+**Output:**
+```
+peon-ping: sounds resumed
+```
+
+## volume
+
+Get or set volume level (0.0–1.0).
+
+### Get Current Volume
+
+```bash
+peon volume
+```
+
+**Output:**
+```
+peon-ping: volume 0.5
+```
+
+### Set Volume
+
+```bash
+peon volume 0.7
+```
+
+**Output:**
+```
+peon-ping: volume set to 0.7
+```
+
+**Valid Range:**
+- Minimum: `0.0` (silent)
+- Maximum: `1.0` (full volume)
+- Values are rounded to 2 decimal places
+
+**Error Handling:**
+
+```bash
+peon volume 1.5
+# Output: peon-ping: volume must be between 0.0 and 1.0
+
+peon volume abc
+# Output: peon-ping: invalid volume "abc" — use a number between 0.0 and 1.0
+```
+
+**Platform Behavior:**
+
+Volume scaling varies by audio backend:
+
+| Platform | Backend | Volume Interpretation |
+|----------|---------|----------------------|
+| macOS | `afplay` | 0.0–1.0 (native) |
+| Linux (PipeWire) | `pw-play` | 0.0–1.0 (native) |
+| Linux (PulseAudio) | `paplay` | Converted to 0–65536 |
+| Linux (FFmpeg) | `ffplay` | Converted to 0–100 |
+| WSL2 | PowerShell MediaPlayer | 0.0–1.0 (native) |
+| Windows | PowerShell MediaPlayer | 0.0–1.0 (native) |
+
+## preview
+
+Play all sounds from a specific category or list available categories.
+
+### Preview a Category
+
+```bash
+peon preview session.start
+```
+
+**Behavior:**
+- Plays all sounds in the category sequentially
+- Uses the currently active pack
+- Respects current volume setting
+- No delay between sounds
+
+### List Categories
+
+```bash
+peon preview --list
+```
+
+**Output:**
+```
+Available categories in peon pack:
+  session.start
+  task.acknowledge
+  task.complete
+  task.error
+  input.required
+  resource.limit
+  user.spam
+```
+
+### Preview All Sounds in Active Pack
+
+```bash
+peon preview
+```
+
+**Behavior:**
+- Defaults to `session.start` category
+- Useful for testing after switching packs
+
+**Available Categories:**
+
+| Category | When It Plays | Example Sounds |
+|----------|---------------|----------------|
+| `session.start` | Agent session begins | *"Ready to work?"*, *"Yes?"* |
+| `task.acknowledge` | Agent acknowledges task | *"On it."*, *"I read you."* |
+| `task.complete` | Task finishes successfully | *"Work, work."*, *"Job's done!"* |
+| `task.error` | Tool or command fails | *"I can't do that."*, *"Son of a bitch!"* |
+| `input.required` | Agent needs permission | *"Something need doing?"*, *"Hmm?"* |
+| `resource.limit` | Rate/token limit hit | *"Zug zug."* |
+| `user.spam` | 3+ prompts in 10 seconds | *"Me busy, leave me alone!"* |
+
+**Extended Categories** (defined in CESP spec, not currently triggered):
+- `session.end` — Session ends
+- `task.progress` — Long-running task progress update
+
+## Examples
+
+### Quick Mute for a Meeting
+
+```bash
+peon pause
+# ... meeting happens ...
+peon resume
+```
+
+### Test New Pack After Install
+
+```bash
+peon packs install glados
+peon packs use glados
+peon preview session.start
+```
+
+### Adjust Volume for Open Office
+
+```bash
+peon volume 0.3
+peon preview task.complete
+```
+
+### Check All Sounds in a Pack
+
+```bash
+peon packs use sc_kerrigan
+peon preview --list
+peon preview session.start
+peon preview task.complete
+peon preview input.required
+```
+
+## Related Commands
+
+- `peon status` — Shows current volume and pause state
+- `peon packs use <name>` — Switch packs before previewing
+- `peon notifications test` — Test desktop notifications (separate from sounds)

@@ -1,0 +1,90 @@
+---
+title: Introduction
+description: Stop babysitting your terminal. Get voice notifications from game characters when your AI coding agent needs attention.
+---
+
+# Stop babysiting your terminal
+
+AI coding agents don't notify you when they finish tasks or need permission. You tab away, lose focus, and waste 15 minutes getting back into flow.
+
+PeonPing fixes this with **voice lines and bold on-screen banners** from Warcraft, StarCraft, Portal, Zelda, and more — works with Claude Code, Cursor, OpenCode, Amp, GitHub Copilot, and any MCP client.
+
+<CardGroup cols={2}>
+  <Card title="Installation" icon="download" href="/installation">
+    Install PeonPing via Homebrew, curl, or Windows installer
+  </Card>
+  <Card title="Quickstart" icon="rocket" href="/quickstart">
+    Get your first peon notification in under 2 minutes
+  </Card>
+  <Card title="Sound Packs" icon="volume" href="/features/sound-packs">
+    Browse 165+ packs from your favorite games
+  </Card>
+  <Card title="Integrations" icon="plug" href="/integrations/overview">
+    Connect to Claude Code, Cursor, OpenCode, and 10+ other IDEs
+  </Card>
+</CardGroup>
+
+## How it works
+
+PeonPing hooks into your AI coding agent and plays sounds + shows notifications when key events happen:
+
+| Event | CESP Category | Examples |
+|---|---|---|
+| Session starts | `session.start` | *"Ready to work?"*, *"Yes?"*, *"What you want?"* |
+| Task finishes | `task.complete` | *"Work, work."*, *"I can do that."*, *"Okie dokie."* |
+| Permission needed | `input.required` | *"Something need doing?"*, *"Hmm?"*, *"What you want?"* |
+| Tool or command error | `task.error` | *"I can't do that."*, *"Son of a bitch!"* |
+| Rate or token limit hit | `resource.limit` | *"Zug zug."* *(pack dependent)* |
+| Rapid prompts (3+ in 10s) | `user.spam` | *"Me busy, leave me alone!"* |
+
+Plus **large overlay banners** on every screen (macOS/WSL/MSYS2) and terminal tab titles (`● project: done`) — you'll know something happened even if you're in another app.
+
+## Key features
+
+<CardGroup cols={2}>
+  <Card title="Voice notifications" icon="volume-high">
+    Game character voice lines from 165+ sound packs
+  </Card>
+  <Card title="Visual alerts" icon="bell">
+    Large overlay banners or standard system notifications
+  </Card>
+  <Card title="Multi-IDE support" icon="grid">
+    Claude Code, Cursor, OpenCode, Amp, GitHub Copilot, and more
+  </Card>
+  <Card title="Remote development" icon="server">
+    Audio relay for SSH, devcontainers, and Codespaces
+  </Card>
+  <Card title="Mobile push" icon="mobile">
+    Get notified on your phone via ntfy, Pushover, or Telegram
+  </Card>
+  <Card title="MCP server" icon="robot">
+    Let AI agents pick their own sounds via Model Context Protocol
+  </Card>
+</CardGroup>
+
+## Platform support
+
+PeonPing works across all major platforms:
+
+- **macOS** — Native `afplay` audio + JXA Cocoa overlays
+- **Linux** — PipeWire/PulseAudio + notify-send
+- **Windows** — Native PowerShell audio + Windows Forms overlays
+- **WSL2** — Full Windows integration
+- **SSH/Remote** — Audio relay routes sound to your local machine
+
+## Open standard
+
+PeonPing implements the [Coding Event Sound Pack Specification (CESP)](https://github.com/PeonPing/openpeon) — an open standard for coding event sounds that any agentic IDE can adopt.
+
+Sound packs use the `openpeon.json` manifest format, making them portable across any CESP-compatible tool.
+
+## Next steps
+
+<CardGroup cols={2}>
+  <Card title="Install PeonPing" icon="download" href="/installation">
+    Choose your installation method
+  </Card>
+  <Card title="Quick start" icon="rocket" href="/quickstart">
+    Get set up in under 2 minutes
+  </Card>
+</CardGroup>

@@ -1,0 +1,325 @@
+---
+title: 'Other IDEs'
+description: 'Windsurf, Kiro, Kimi Code, Antigravity, and OpenClaw adapters'
+---
+
+PeonPing supports additional agentic IDEs through specialized adapters. Each has unique setup requirements.
+
+## Windsurf
+
+Windsurf (Codeium IDE) supports custom hooks via `hooks.json`.
+
+### Setup
+
+<Steps>
+  <Step title="Install PeonPing">
+    ```bash
+    curl -fsSL https://raw.githubusercontent.com/PeonPing/peon-ping/main/install.sh | bash
+    ```
+  </Step>
+
+  <Step title="Add hooks">
+    **User-level:** `~/.codeium/windsurf/hooks.json`
+
+    **Workspace-level:** `.windsurf/hooks.json`
+
+    ```json
+    {
+      "hooks": {
+        "post_cascade_response": [
+          {
+            "command": "bash ~/.claude/hooks/peon-ping/adapters/windsurf.sh post_cascade_response",
+            "show_output": false
+          }
+        ],
+        "pre_user_prompt": [
+          {
+            "command": "bash ~/.claude/hooks/peon-ping/adapters/windsurf.sh pre_user_prompt",
+            "show_output": false
+          }
+        ],
+        "post_write_code": [
+          {
+            "command": "bash ~/.claude/hooks/peon-ping/adapters/windsurf.sh post_write_code",
+            "show_output": false
+          }
+        ],
+        "post_run_command": [
+          {
+            "command": "bash ~/.claude/hooks/peon-ping/adapters/windsurf.sh post_run_command",
+            "show_output": false
+          }
+        ]
+      }
+    }
+    ```
+  </Step>
+</Steps>
+
+### Event Mapping
+
+| Windsurf Hook | CESP Category | Trigger |
+|---------------|---------------|---------|
+| `pre_user_prompt` (first) | `session.start` | First prompt in session |
+| `pre_user_prompt` (subsequent) | `task.acknowledge` | Subsequent prompts |
+| `post_cascade_response` | `task.complete` | Agent finishes Cascade turn |
+| `post_write_code` | `task.complete` | Code write completes |
+| `post_run_command` | `task.complete` | Command execution completes |
+
+---
+
+## Kiro CLI
+
+Kiro CLI (Amazon) has a hook system nearly identical to Claude Code.
+
+### Setup
+
+<Steps>
+  <Step title="Install PeonPing">
+    ```bash
+    curl -fsSL https://raw.githubusercontent.com/PeonPing/peon-ping/main/install.sh | bash
+    ```
+  </Step>
+
+  <Step title="Create ~/.kiro/agents/peon-ping.json">
+    ```json
+    {
+      "hooks": {
+        "agentSpawn": [
+          {
+            "command": "bash ~/.claude/hooks/peon-ping/adapters/kiro.sh"
+          }
+        ],
+        "userPromptSubmit": [
+          {
+            "command": "bash ~/.claude/hooks/peon-ping/adapters/kiro.sh"
+          }
+        ],
+        "stop": [
+          {
+            "command": "bash ~/.claude/hooks/peon-ping/adapters/kiro.sh"
+          }
+        ]
+      }
+    }
+    ```
+  </Step>
+</Steps>
+
+### Event Mapping
+
+| Kiro Event | CESP Category | Trigger |
+|------------|---------------|---------|
+| `agentSpawn` | `session.start` | Agent session starts |
+| `userPromptSubmit` | `task.acknowledge` | User submits prompt |
+| `stop` | `task.complete` | Agent stops |
+
+<Note>
+  `preToolUse` and `postToolUse` are intentionally excluded — they fire on every tool call and would be extremely noisy.
+</Note>
+
+---
+
+## Kimi Code CLI
+
+Kimi Code (MoonshotAI) writes Wire Mode events to `~/.kimi/sessions/`. PeonPing watches these files as a background daemon.
+
+### Setup
+
+<Steps>
+  <Step title="Install PeonPing">
+    ```bash
+    curl -fsSL https://raw.githubusercontent.com/PeonPing/peon-ping/main/install.sh | bash
+    ```
+  </Step>
+
+  <Step title="Install filesystem watcher">
+    **macOS:**
+    ```bash
+    brew install fswatch
+    ```
+
+    **Linux:**
+    ```bash
+    sudo apt install inotify-tools
+    ```
+  </Step>
+
+  <Step title="Start the daemon">
+    ```bash
+    bash ~/.claude/hooks/peon-ping/adapters/kimi.sh --install
+    ```
+
+    The adapter starts in the background and watches `~/.kimi/sessions/`.
+  </Step>
+</Steps>
+
+### Event Mapping
+
+| Kimi Wire Event | CESP Category | Trigger |
+|-----------------|---------------|---------|
+| New session + `TurnBegin` | `session.start` | First turn in session |
+| `TurnBegin` (subsequent) | `task.acknowledge` | Subsequent turns |
+| `TurnEnd` | `task.complete` | Agent finishes turn |
+| `CompactionBegin` | `resource.limit` | Context compaction (token limit) |
+| `SubagentEvent` → `TurnBegin` | Subagent tracking | Sub-agent spawned |
+
+### Daemon Commands
+
+```bash
+bash ~/.claude/hooks/peon-ping/adapters/kimi.sh --status     # Check status
+bash ~/.claude/hooks/peon-ping/adapters/kimi.sh --uninstall  # Stop daemon
+```
+
+### /clear Detection
+
+Kimi Code emits `TurnEnd` for the old session and immediately creates a new one when you run `/clear`. The adapter suppresses the old session's `TurnEnd` within a 5-second grace window.
+
+---
+
+## Google Antigravity
+
+Antigravity stores conversations as protobuf files (`.pb`) in `~/.gemini/antigravity/conversations/`. PeonPing watches these files.
+
+### Setup
+
+<Steps>
+  <Step title="Install PeonPing">
+    ```bash
+    curl -fsSL https://raw.githubusercontent.com/PeonPing/peon-ping/main/install.sh | bash
+    ```
+  </Step>
+
+  <Step title="Install filesystem watcher">
+    **macOS:**
+    ```bash
+    brew install fswatch
+    ```
+
+    **Linux:**
+    ```bash
+    sudo apt install inotify-tools
+    ```
+  </Step>
+
+  <Step title="Start the adapter">
+    **Foreground:**
+    ```bash
+    bash ~/.claude/hooks/peon-ping/adapters/antigravity.sh
+    ```
+
+    **Background:**
+    ```bash
+    bash ~/.claude/hooks/peon-ping/adapters/antigravity.sh &
+    ```
+  </Step>
+</Steps>
+
+### Event Mapping
+
+| Antigravity Event | CESP Category | Trigger |
+|-------------------|---------------|---------|
+| New `.pb` file | `session.start` | New conversation |
+| File idle 5s | `task.complete` | Agent stopped updating |
+
+### Configuration
+
+Environment variables:
+
+| Variable | Default | Description |
+|----------|---------|-------------|
+| `ANTIGRAVITY_DIR` | `~/.gemini/antigravity` | Antigravity data directory |
+| `ANTIGRAVITY_CONVERSATIONS_DIR` | `$ANTIGRAVITY_DIR/conversations` | Conversations directory |
+| `ANTIGRAVITY_IDLE_SECONDS` | `5` | Idle threshold for Stop events |
+| `ANTIGRAVITY_STOP_COOLDOWN` | `10` | Cooldown between Stop events |
+
+---
+
+## OpenClaw
+
+OpenClaw is a gateway framework for AI agents. The adapter accepts CESP category names or Claude Code hook events.
+
+### Setup
+
+<Steps>
+  <Step title="Install PeonPing">
+    ```bash
+    curl -fsSL https://raw.githubusercontent.com/PeonPing/peon-ping/main/install.sh | bash
+    ```
+  </Step>
+
+  <Step title="Call from your OpenClaw skill">
+    ```bash
+    bash ~/.claude/hooks/peon-ping/adapters/openclaw.sh <event>
+    ```
+  </Step>
+</Steps>
+
+### Event Names
+
+**Core CESP categories:**
+
+```bash
+bash openclaw.sh session.start
+bash openclaw.sh task.complete
+bash openclaw.sh task.error
+bash openclaw.sh input.required
+bash openclaw.sh task.acknowledge
+bash openclaw.sh resource.limit
+```
+
+**Aliases:**
+
+```bash
+bash openclaw.sh greeting       # → session.start
+bash openclaw.sh done           # → task.complete
+bash openclaw.sh error          # → task.error
+bash openclaw.sh permission     # → input.required
+bash openclaw.sh ratelimit      # → resource.limit
+```
+
+**Raw Claude Code events:**
+
+```bash
+bash openclaw.sh SessionStart
+bash openclaw.sh Stop
+bash openclaw.sh Notification
+bash openclaw.sh PostToolUseFailure
+```
+
+### Example OpenClaw Skill
+
+```bash
+#!/bin/bash
+# play.sh - OpenClaw skill for PeonPing
+
+OPENCLAW_EVENT="${1:-task.complete}"
+bash ~/.claude/hooks/peon-ping/adapters/openclaw.sh "$OPENCLAW_EVENT"
+```
+
+Call from your agent logic:
+
+```bash
+# Agent starts
+bash play.sh session.start
+
+# Agent finishes task
+bash play.sh task.complete
+
+# Rate limit hit
+bash play.sh ratelimit
+```
+
+---
+
+## Windows Support
+
+All adapters have native PowerShell (`.ps1`) versions:
+
+- `windsurf.ps1`
+- `kiro.ps1`
+- `kimi.ps1` (uses .NET `FileSystemWatcher`)
+- `antigravity.ps1` (uses .NET `FileSystemWatcher`)
+- `openclaw.ps1`
+
+The Windows installer (`install.ps1`) copies them to `~/.claude/hooks/peon-ping/adapters/`.

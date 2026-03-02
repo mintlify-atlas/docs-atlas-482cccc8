@@ -1,0 +1,192 @@
+---
+title: Installation
+description: Install PeonPing via Homebrew, installer script, Windows PowerShell, Nix, or from source.
+---
+
+# Installation
+
+Choose the installation method that works best for your platform.
+
+## Homebrew (macOS and Linux)
+
+<Steps>
+  <Step title="Install PeonPing">
+    ```bash
+    brew install PeonPing/tap/peon-ping
+    ```
+  </Step>
+  <Step title="Register hooks and download sound packs">
+    ```bash
+    peon-ping-setup
+    ```
+    
+    This registers hooks in `~/.claude/settings.json` and downloads 5 curated sound packs (Warcraft, StarCraft, Portal).
+  </Step>
+</Steps>
+
+<Tip>Homebrew is the recommended installation method for macOS and Linux.</Tip>
+
+## Installer script (macOS, Linux, WSL2)
+
+<Steps>
+  <Step title="Run the installer">
+    <CodeGroup>
+    ```bash Default (5 curated packs)
+    curl -fsSL https://raw.githubusercontent.com/PeonPing/peon-ping/main/install.sh | bash
+    ```
+    
+    ```bash All packs (165+)
+    curl -fsSL https://raw.githubusercontent.com/PeonPing/peon-ping/main/install.sh | bash -s -- --all
+    ```
+    
+    ```bash Specific packs
+    curl -fsSL https://raw.githubusercontent.com/PeonPing/peon-ping/main/install.sh | bash -s -- --packs=peon,glados,sc_kerrigan
+    ```
+    </CodeGroup>
+  </Step>
+</Steps>
+
+The installer:
+- Registers hooks in `~/.claude/settings.json`
+- Downloads sound packs to `~/.claude/hooks/peon-ping/packs/`
+- Adds the `peon` CLI alias to your shell rc file
+- Installs shell completions (bash/fish)
+
+### Installer flags
+
+| Flag | Description |
+|---|---|
+| `--all` | Install all 165+ available packs |
+| `--packs=<list>` | Install specific packs (comma-separated) |
+| `--local` | Install into `./.claude/` for current project |
+| `--global` | Explicit global install (default) |
+| `--init-local-config` | Create `./.claude/hooks/peon-ping/config.json` only |
+
+<Note>The `--local` flag installs packs and config into the current project's `./.claude/` directory, but hooks are always registered globally in `~/.claude/settings.json` with absolute paths.</Note>
+
+### Pick your packs interactively
+
+Visit [peonping.com/#picker](https://peonping.com/#picker) to browse all 165+ packs with audio previews and get a custom install command.
+
+## Windows installer
+
+<Steps>
+  <Step title="Run the PowerShell installer">
+    <CodeGroup>
+    ```powershell Default (5 curated packs)
+    Invoke-WebRequest -Uri "https://raw.githubusercontent.com/PeonPing/peon-ping/main/install.ps1" -UseBasicParsing | Invoke-Expression
+    ```
+    
+    ```powershell All packs
+    Invoke-WebRequest -Uri "https://raw.githubusercontent.com/PeonPing/peon-ping/main/install.ps1" -UseBasicParsing | Invoke-Expression -Args "-All"
+    ```
+    
+    ```powershell Specific packs
+    Invoke-WebRequest -Uri "https://raw.githubusercontent.com/PeonPing/peon-ping/main/install.ps1" -UseBasicParsing | Invoke-Expression -Args "-Packs peon,glados,sc_kerrigan"
+    ```
+    </CodeGroup>
+  </Step>
+</Steps>
+
+The Windows installer:
+- Registers hooks for Claude Code and Cursor
+- Downloads sound packs to `~/.claude/hooks/peon-ping/packs/`
+- Creates `peon.cmd` CLI shortcut in `~/.local/bin`
+- Installs Claude Code skills
+
+## Nix (macOS and Linux)
+
+Run directly from source without installing:
+
+```bash
+nix run github:PeonPing/peon-ping -- status
+nix run github:PeonPing/peon-ping -- packs install peon
+```
+
+Or install to your profile:
+
+```bash
+nix profile install github:PeonPing/peon-ping
+```
+
+### Home Manager module
+
+For declarative configuration:
+
+```nix
+# In your home.nix or flake.nix
+{ inputs, pkgs, ... }: {
+  imports = [ inputs.peon-ping.homeManagerModules.default ];
+
+  programs.peon-ping = {
+    enable = true;
+    package = inputs.peon-ping.packages.${pkgs.system}.default;
+    
+    settings = {
+      default_pack = "glados";
+      volume = 0.7;
+      enabled = true;
+      desktop_notifications = true;
+      categories = {
+        "session.start" = true;
+        "task.complete" = true;
+        "task.error" = true;
+        "input.required" = true;
+        "resource.limit" = true;
+        "user.spam" = true;
+      };
+    };
+    
+    installPacks = [ "peon" "glados" "sc_kerrigan" ];
+    enableZshIntegration = true;
+  };
+}
+```
+
+This creates `~/.openpeon/config.json` and installs specified packs automatically.
+
+## Clone and inspect first
+
+If you prefer to inspect the source before running:
+
+<Steps>
+  <Step title="Clone the repository">
+    ```bash
+    git clone https://github.com/PeonPing/peon-ping.git
+    cd peon-ping
+    ```
+  </Step>
+  <Step title="Run the installer">
+    ```bash
+    ./install.sh
+    ```
+  </Step>
+</Steps>
+
+## Re-running the installer
+
+Re-run the installer to update PeonPing while preserving your config and state:
+
+```bash
+curl -fsSL https://raw.githubusercontent.com/PeonPing/peon-ping/main/install.sh | bash
+```
+
+The installer detects existing installations and preserves:
+- `config.json` settings
+- `.state.json` session data
+- Installed sound packs
+
+## Install conflicts
+
+If a global install exists and you install local (or vice versa), the installer prompts you to remove the existing one to avoid conflicts.
+
+## Next steps
+
+<CardGroup cols={2}>
+  <Card title="Quickstart" icon="rocket" href="/quickstart">
+    Get your first notification in under 2 minutes
+  </Card>
+  <Card title="Sound Packs" icon="volume" href="/features/sound-packs">
+    Browse and install more sound packs
+  </Card>
+</CardGroup>

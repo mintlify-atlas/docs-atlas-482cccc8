@@ -1,0 +1,422 @@
+---
+title: Notifications
+description: Desktop overlay notifications, standard system alerts, themes, positioning, and mobile push notifications
+---
+
+PeonPing sends visual notifications alongside sounds so you know when the agent needs attention — even if you're in another app.
+
+## Notification Styles
+
+Choose between two desktop notification styles:
+
+<Tabs>
+  <Tab title="Overlay (Default)">
+    **Large, visible banners** that appear on all screens.
+    
+    **Technology:**
+    - **macOS:** JXA Cocoa overlay
+    - **WSL/MSYS2:** Windows Forms popup
+    - **Linux:** Custom implementation
+    
+    **Features:**
+    - Appears on top of all windows
+    - Click to focus your terminal (Ghostty, Warp, iTerm2, Zed, Terminal.app)
+    - iTerm2: clicks focus the correct tab/pane/window — not just the app
+    - Customizable themes (macOS only)
+    - Configurable position and auto-dismiss timing
+    
+    **Enable overlay style:**
+    ```bash
+    peon notifications overlay
+    ```
+    
+    **Configuration:**
+    ```json
+    {
+      "notification_style": "overlay",
+      "overlay_theme": "jarvis",
+      "notification_position": "top-center",
+      "notification_dismiss_seconds": 4
+    }
+    ```
+  </Tab>
+  
+  <Tab title="Standard">
+    **System notifications** using native OS notification centers.
+    
+    **Technology:**
+    - **macOS:** `terminal-notifier` or `osascript`
+    - **WSL/MSYS2:** Windows toast notifications
+    - **Linux:** `notify-send`
+    
+    **Features:**
+    - Integrates with system notification center
+    - Respects Do Not Disturb settings
+    - When `terminal-notifier` is installed, clicking focuses your terminal automatically
+    
+    **Install terminal-notifier (macOS):**
+    ```bash
+    brew install terminal-notifier
+    ```
+    
+    **Enable standard style:**
+    ```bash
+    peon notifications standard
+    ```
+  </Tab>
+</Tabs>
+
+## Overlay Themes (macOS)
+
+Customize the appearance of overlay notifications with built-in themes:
+
+<AccordionGroup>
+  <Accordion title="jarvis (Circular HUD)">
+    Inspired by Iron Man's JARVIS interface.
+    
+    **Features:**
+    - Circular HUD with rotating arcs
+    - Graduation ticks around the perimeter
+    - Progress ring animation
+    - Tech-forward aesthetic
+    
+    **Set theme:**
+    ```bash
+    peon notifications overlay
+    # Then edit config.json:
+    # "overlay_theme": "jarvis"
+    ```
+  </Accordion>
+  
+  <Accordion title="glass (Glassmorphism)">
+    Modern glassmorphism design with blur effects.
+    
+    **Features:**
+    - Frosted glass panel
+    - Accent color bar on the left
+    - Progress line at bottom
+    - Timestamp display
+    - Soft shadows and blur
+    
+    **Configuration:**
+    ```json
+    {
+      "overlay_theme": "glass"
+    }
+    ```
+  </Accordion>
+  
+  <Accordion title="sakura (Zen Garden)">
+    Peaceful Japanese zen garden aesthetic.
+    
+    **Features:**
+    - Bonsai tree illustration
+    - Animated cherry blossom petals
+    - Soft pastel colors
+    - Calming, minimalist design
+    
+    **Best for:** Distraction-free coding sessions
+  </Accordion>
+  
+  <Accordion title="Default (No theme)">
+    Simple, minimal overlay without custom styling.
+    
+    **Set default:**
+    ```json
+    {
+      "overlay_theme": ""
+    }
+    ```
+    
+    Or omit the `overlay_theme` key entirely.
+  </Accordion>
+</AccordionGroup>
+
+## Positioning
+
+Control where overlay notifications appear on screen:
+
+```bash
+# View current position
+peon notifications position
+
+# Set position
+peon notifications position top-left
+peon notifications position top-center
+peon notifications position top-right
+peon notifications position bottom-left
+peon notifications position bottom-center
+peon notifications position bottom-right
+```
+
+**Configuration:**
+```json
+{
+  "notification_position": "top-center"
+}
+```
+
+**Default:** `top-center`
+
+## Auto-Dismiss Timing
+
+Set how long notifications stay visible before automatically dismissing:
+
+```bash
+# View current timing
+peon notifications dismiss
+
+# Set auto-dismiss to 8 seconds
+peon notifications dismiss 8
+
+# Persistent notifications (click to dismiss)
+peon notifications dismiss 0
+```
+
+**Configuration:**
+```json
+{
+  "notification_dismiss_seconds": 4
+}
+```
+
+**Default:** 4 seconds  
+**Set to 0:** Notifications persist until clicked
+
+## Project Labels
+
+Customize the project name shown in notification titles:
+
+### Auto-Detection Priority
+
+1. `notification_title_override` (config)
+2. `.peon-label` file in project root
+3. `project_name_map` (path pattern matching)
+4. Git repository name
+5. Directory name
+
+### Override for Specific Project
+
+```bash
+# Set label for current directory
+peon notifications label "Client A Dashboard"
+
+# Reset to auto-detection
+peon notifications label reset
+```
+
+### Map Paths to Labels
+
+Define labels for multiple projects:
+
+```json
+{
+  "project_name_map": {
+    "/home/user/work/client-a": "Client A",
+    "/home/user/personal/blog": "Personal Blog",
+    "*/services": "Microservices"
+  }
+}
+```
+
+**Pattern matching:** Use `*` wildcards for flexible path rules
+
+### Create .peon-label File
+
+Place a `.peon-label` file in your project root:
+
+```bash
+echo "My Project" > .peon-label
+```
+
+This takes precedence over path mapping but is overridden by `notification_title_override`.
+
+## Message Templates
+
+Customize notification text for each event type:
+
+```bash
+# View current template
+peon notifications template stop
+
+# Set custom template
+peon notifications template stop "{project}: Task finished"
+peon notifications template permission "{project}: {tool_name} needs approval"
+peon notifications template error "Error in {project}: {summary}"
+
+# Reset to default
+peon notifications template stop reset
+```
+
+### Available Template Variables
+
+| Variable | Description | Available In |
+|----------|-------------|-------------|
+| `{project}` | Project name (auto-detected or overridden) | All events |
+| `{summary}` | Event summary or message | All events |
+| `{tool_name}` | Name of the tool being used | `permission`, `stop` |
+| `{status}` | Success/failure status | `stop` |
+| `{event}` | Event category (e.g., `task.complete`) | All events |
+
+### Event Types
+
+| Key | When It Fires |
+|-----|---------------|
+| `stop` | Agent finishes task |
+| `permission` | Tool needs approval |
+| `error` | Tool or command fails |
+| `idle` | Agent waiting for input |
+| `question` | Agent has a question |
+
+### Configuration
+
+```json
+{
+  "notification_templates": {
+    "stop": "{project}: {summary}",
+    "permission": "{project}: {tool_name} needs approval",
+    "error": "{project}: Error — {summary}",
+    "idle": "{project}: Waiting for input",
+    "question": "{project}: {summary}"
+  }
+}
+```
+
+## Independent Controls
+
+Notifications, sounds, and mobile push work independently:
+
+<Table>
+  <thead>
+    <tr>
+      <th>Config Key</th>
+      <th>Controls</th>
+      <th>Affects Sounds</th>
+      <th>Affects Desktop</th>
+      <th>Affects Mobile</th>
+    </tr>
+  </thead>
+  <tbody>
+    <tr>
+      <td>`enabled`</td>
+      <td>Master audio switch</td>
+      <td>✅ Yes</td>
+      <td>❌ No</td>
+      <td>❌ No</td>
+    </tr>
+    <tr>
+      <td>`desktop_notifications`</td>
+      <td>Desktop popups</td>
+      <td>❌ No</td>
+      <td>✅ Yes</td>
+      <td>❌ No</td>
+    </tr>
+    <tr>
+      <td>`mobile_notify.enabled`</td>
+      <td>Phone push notifications</td>
+      <td>❌ No</td>
+      <td>❌ No</td>
+      <td>✅ Yes</td>
+    </tr>
+  </tbody>
+</Table>
+
+### Common Combinations
+
+```bash
+# Sounds only (no visual distractions)
+peon notifications off
+
+# Silent mode with popups
+peon pause
+# (desktop_notifications remains true)
+
+# Mobile only (working remotely)
+peon pause
+peon notifications off
+peon mobile on
+
+# Complete silence
+peon pause
+peon notifications off
+peon mobile off
+```
+
+## Mobile Notifications
+
+Get push notifications on your phone when tasks finish or need attention.
+
+### Quick Start (ntfy.sh — free, no account)
+
+1. Install [ntfy app](https://ntfy.sh) on your phone
+2. Subscribe to a unique topic (e.g., `my-peon-notifications`)
+3. Run:
+   ```bash
+   peon mobile ntfy my-peon-notifications
+   ```
+
+### Supported Services
+
+<Tabs>
+  <Tab title="ntfy.sh">
+    **Free, open-source, no account required**
+    
+    ```bash
+    peon mobile ntfy your-unique-topic
+    ```
+    
+    **Security tip:** Use a long, random topic name to prevent others from subscribing
+  </Tab>
+  
+  <Tab title="Pushover">
+    **Paid service with rich notification features**
+    
+    ```bash
+    peon mobile pushover <user_key> <app_token>
+    ```
+    
+    [Get API keys from pushover.net](https://pushover.net)
+  </Tab>
+  
+  <Tab title="Telegram">
+    **Free with Telegram bot integration**
+    
+    ```bash
+    peon mobile telegram <bot_token> <chat_id>
+    ```
+    
+    [Create a bot with BotFather](https://core.telegram.org/bots)
+  </Tab>
+</Tabs>
+
+### Mobile Commands
+
+```bash
+peon mobile on            # Enable mobile notifications
+peon mobile off           # Disable mobile notifications
+peon mobile status        # Show current config
+peon mobile test          # Send a test notification
+```
+
+**Behavior:** Mobile notifications fire on every event regardless of window focus — they're independent from desktop notifications and sounds.
+
+## Testing Notifications
+
+Send a test notification to verify your setup:
+
+```bash
+peon notifications test
+```
+
+This sends a sample notification using your current style (overlay or standard) and configuration.
+
+## Related Configuration
+
+<CardGroup cols={2}>
+  <Card title="Sound Events" icon="volume-high" href="/features/sound-events">
+    CESP event categories and when sounds play
+  </Card>
+  <Card title="Sound Packs" icon="music" href="/features/sound-packs">
+    Browse 165+ packs and customize notification themes
+  </Card>
+</CardGroup>

@@ -1,0 +1,193 @@
+---
+title: 'GitHub Copilot'
+description: 'Repository hooks.json adapter for GitHub Copilot agent sessions'
+---
+
+GitHub Copilot supports custom hooks via `.github/hooks/hooks.json` in your repository. PeonPing provides a shell adapter with full CESP v1.0 conformance.
+
+## Setup
+
+<Steps>
+  <Step title="Install PeonPing">
+    ```bash
+    curl -fsSL https://raw.githubusercontent.com/PeonPing/peon-ping/main/install.sh | bash
+    ```
+  </Step>
+
+  <Step title="Create .github/hooks/hooks.json">
+    In your repository, create `.github/hooks/hooks.json` on the **default branch**:
+
+    ```json
+    {
+      "version": 1,
+      "hooks": {
+        "sessionStart": [
+          {
+            "type": "command",
+            "bash": "bash ~/.claude/hooks/peon-ping/adapters/copilot.sh sessionStart"
+          }
+        ],
+        "userPromptSubmitted": [
+          {
+            "type": "command",
+            "bash": "bash ~/.claude/hooks/peon-ping/adapters/copilot.sh userPromptSubmitted"
+          }
+        ],
+        "postToolUse": [
+          {
+            "type": "command",
+            "bash": "bash ~/.claude/hooks/peon-ping/adapters/copilot.sh postToolUse"
+          }
+        ],
+        "errorOccurred": [
+          {
+            "type": "command",
+            "bash": "bash ~/.claude/hooks/peon-ping/adapters/copilot.sh errorOccurred"
+          }
+        ]
+      }
+    }
+    ```
+  </Step>
+
+  <Step title="Commit and merge">
+    ```bash
+    git add .github/hooks/hooks.json
+    git commit -m "Add PeonPing hooks for Copilot"
+    git push
+    ```
+
+    Hooks activate on your next Copilot agent session.
+  </Step>
+</Steps>
+
+## How It Works
+
+GitHub Copilot fires hook events during agent sessions. The adapter receives JSON on stdin:
+
+```json
+{
+  "sessionId": "abc123",
+  "cwd": "/Users/dev/project",
+  "timestamp": 1234567890
+}
+```
+
+And transforms it to the format `peon.sh` expects:
+
+```json
+{
+  "hook_event_name": "Stop",
+  "notification_type": "",
+  "cwd": "/Users/dev/project",
+  "session_id": "copilot-abc123",
+  "permission_mode": ""
+}
+```
+
+## Event Mapping
+
+| Copilot Hook | CESP Category | Trigger |
+|--------------|---------------|---------|
+| `sessionStart` | `session.start` | Agent session begins |
+| `userPromptSubmitted` | `session.start` (first) / `user.spam` (rapid) | First prompt = greeting, 3+ rapid prompts = spam |
+| `postToolUse` | `task.complete` | Tool execution finishes |
+| `errorOccurred` | `task.error` | Error during session |
+
+<Note>
+  `preToolUse` is intentionally excluded — it fires before every tool call and would be too noisy.
+</Note>
+
+## Session Tracking
+
+The adapter tracks session starts to distinguish greeting sounds from spam detection:
+
+```bash
+case "$COPILOT_EVENT" in
+  userPromptSubmitted)
+    SESSION_MARKER="$PEON_DIR/.copilot-session-${SESSION_ID}"
+    if [ ! -f "$SESSION_MARKER" ]; then
+      touch "$SESSION_MARKER"
+      EVENT="SessionStart"  # First prompt = greeting
+    else
+      EVENT="UserPromptSubmit"  # Subsequent = spam check
+    fi
+    ;;
+esac
+```
+
+Session markers expire after 24 hours (via `find -mtime +0 -delete`).
+
+## Error Handling
+
+For `errorOccurred` events, the adapter injects synthetic `tool_name` and `error` fields so `peon.sh` knows to emit a `task.error` sound:
+
+```bash
+if [ "$EVENT" = "PostToolUseFailure" ]; then
+  echo "$INPUT" | jq --arg event "$EVENT" \
+    '{hook_event_name: $event, tool_name: "Bash", error: "errorOccurred"}' \
+    | bash "$PEON_DIR/peon.sh"
+fi
+```
+
+## Desktop Notifications
+
+The adapter inherits notification settings from `config.json`:
+
+- **Overlay banners** (default) — Large, visible popups on all screens
+- **Standard notifications** — macOS Notification Center or `terminal-notifier`
+
+Notifications fire only when the terminal is not focused.
+
+## Spam Detection
+
+Rapid prompt detection: 3+ prompts within 10 seconds triggers `user.spam` sounds.
+
+```bash
+# peon.sh tracks prompt timestamps in .state.json
+# and checks against annoyed_threshold / annoyed_window_seconds
+```
+
+## Per-Repository Hooks
+
+Since hooks live in `.github/hooks/hooks.json`, you can customize per repository:
+
+```json
+{
+  "version": 1,
+  "hooks": {
+    "sessionStart": [
+      {
+        "type": "command",
+        "bash": "PEON_PACK=glados bash ~/.claude/hooks/peon-ping/adapters/copilot.sh sessionStart"
+      }
+    ]
+  }
+}
+```
+
+Set `PEON_PACK` to override the active pack for that repository.
+
+## Limitations
+
+- **Hooks must be on default branch** — GitHub Copilot only reads hooks from the default branch (usually `main` or `master`)
+- **No session end event** — Copilot doesn't expose a `sessionEnd` hook
+- **No permission prompt detection** — Tool approval events aren't exposed
+
+## Windows Support
+
+Use the PowerShell adapter (`copilot.ps1`) on native Windows:
+
+```json
+{
+  "version": 1,
+  "hooks": {
+    "sessionStart": [
+      {
+        "type": "command",
+        "bash": "powershell -File ~/.claude/hooks/peon-ping/adapters/copilot.ps1 sessionStart"
+      }
+    ]
+  }
+}
+```
