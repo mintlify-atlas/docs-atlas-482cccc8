@@ -1,0 +1,147 @@
+{
+  "projectType": "cli-tool",
+  "projectName": "PeonPing",
+  "projectDescription": "Voice notifications and visual alerts for AI coding agents using game character sound packs from Warcraft, StarCraft, Portal, and more.",
+  "theme": "willow",
+  "primaryColor": "#D4A574",
+  "lightColor": "#F5E6D3",
+  "darkColor": "#8B6914",
+  "navigation": {
+    "tabs": [
+      {
+        "tab": "Documentation",
+        "groups": [
+          {
+            "group": "Get Started",
+            "pages": [
+              "introduction",
+              "installation",
+              "quickstart"
+            ]
+          },
+          {
+            "group": "Core Features",
+            "pages": [
+              "features/sound-events",
+              "features/notifications",
+              "features/sound-packs",
+              "features/peon-trainer"
+            ]
+          },
+          {
+            "group": "Configuration",
+            "pages": [
+              "configuration/overview",
+              "configuration/sound-control",
+              "configuration/notifications",
+              "configuration/pack-rotation"
+            ]
+          },
+          {
+            "group": "CLI Reference",
+            "pages": [
+              "cli/overview",
+              "cli/sound-control",
+              "cli/pack-management",
+              "cli/notifications",
+              "cli/trainer",
+              "cli/relay"
+            ]
+          },
+          {
+            "group": "Integrations",
+            "pages": [
+              "integrations/overview",
+              "integrations/claude-code",
+              "integrations/amp",
+              "integrations/opencode",
+              "integrations/cursor",
+              "integrations/github-copilot",
+              "integrations/gemini-cli",
+              "integrations/kilo-cli",
+              "integrations/other-ides"
+            ]
+          },
+          {
+            "group": "Advanced",
+            "pages": [
+              "advanced/remote-development",
+              "advanced/mobile-notifications",
+              "advanced/mcp-server",
+              "advanced/custom-packs"
+            ]
+          },
+          {
+            "group": "Resources",
+            "pages": [
+              "resources/troubleshooting",
+              "resources/faq",
+              "resources/contributing",
+              "resources/changelog"
+            ]
+          }
+        ]
+      },
+      {
+        "tab": "API Reference",
+        "groups": [
+          {
+            "group": "CESP Standard",
+            "pages": [
+              "api/cesp-overview",
+              "api/event-categories",
+              "api/pack-manifest"
+            ]
+          },
+          {
+            "group": "MCP Server",
+            "pages": [
+              "api/mcp-overview",
+              "api/mcp-tools",
+              "api/mcp-resources"
+            ]
+          },
+          {
+            "group": "Relay Protocol",
+            "pages": [
+              "api/relay-overview",
+              "api/relay-endpoints"
+            ]
+          }
+        ]
+      }
+    ]
+  },
+  "keyFeatures": [
+    "Voice notifications using game character sound packs",
+    "Visual overlay notifications on all screens",
+    "165+ sound packs from Warcraft, StarCraft, Portal, Zelda, and more",
+    "Multi-IDE support via adapters (Claude Code, Cursor, OpenCode, Amp, etc.)",
+    "Remote development support via audio relay (SSH, devcontainers, Codespaces)",
+    "Mobile push notifications",
+    "MCP server for AI agent sound selection",
+    "Peon Trainer for exercise reminders during coding sessions",
+    "Configurable pack rotation and per-project pack binding",
+    "CESP v1.0 compliant (Coding Event Sound Pack Specification)"
+  ],
+  "publicApiSurface": [
+    "peon toggle",
+    "peon pause",
+    "peon resume",
+    "peon volume [0.0-1.0]",
+    "peon rotation [random|round-robin|session_override]",
+    "peon packs list",
+    "peon packs install <packs>",
+    "peon packs use <pack>",
+    "peon packs next",
+    "peon packs bind <pack>",
+    "peon notifications on|off",
+    "peon notifications overlay|standard",
+    "peon notifications position <pos>",
+    "peon preview [category]",
+    "peon mobile ntfy|pushover|telegram",
+    "peon trainer on|off",
+    "peon trainer log <n> <exercise>",
+    "peon relay --daemon"
+  ]
+}
